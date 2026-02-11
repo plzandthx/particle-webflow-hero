@@ -54,7 +54,7 @@ export default function HeroSection() {
       mouse.y = e.clientY - r.top;
     };
 
-    const onTouchMove = (e: TouchEvent) => {
+    const handleTouch = (e: TouchEvent) => {
       if (!container) return;
       e.preventDefault();
       const touch = e.touches[0];
@@ -84,7 +84,9 @@ export default function HeroSection() {
         maskGroupRef.current?.prepend(p.el);
       }
 
+      const isTouchDevice = 'ontouchstart' in window;
       if (cursorRef.current) {
+        cursorRef.current.style.display = isTouchDevice ? 'none' : 'block';
         cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
       }
 
@@ -93,14 +95,16 @@ export default function HeroSection() {
     };
 
     window.addEventListener('mousemove', onMouseMove);
-    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchstart', handleTouch, { passive: false });
+    container.addEventListener('touchmove', handleTouch, { passive: false });
     window.addEventListener('resize', updateSize);
     updateSize();
     loop();
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
-      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchstart', handleTouch);
+      container.removeEventListener('touchmove', handleTouch);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
@@ -114,6 +118,7 @@ export default function HeroSection() {
         width: '100%',
         height: '100vh',
         overflow: 'hidden',
+        touchAction: 'none',
         backgroundColor: '#F5F5F5',
         cursor: 'none',
       }}
