@@ -44,6 +44,12 @@ export default function HeroSection() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Preload logo image
+    const logoImg = new Image();
+    logoImg.src = '/images/hero-logo.png';
+    let logoLoaded = false;
+    logoImg.onload = () => { logoLoaded = true; };
+
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
@@ -138,19 +144,33 @@ export default function HeroSection() {
       const fullText = 'Building something special at SurveyMonkey';
       const lines = wrapText(fullText, maxTextWidth, fontSize);
       const lineHeight = fontSize * 1.15;
-      const totalHeight = lines.length * lineHeight;
-      const startY = (cssH - totalHeight) / 2 + lineHeight / 2;
+      const totalTextHeight = lines.length * lineHeight;
 
+      // Logo dimensions
+      const logoHeight = fontSize * 1.2;
+      const logoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
+      const logoGap = fontSize * 0.4;
+      const totalBlockHeight = (logoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
+      const blockStartY = (cssH - totalBlockHeight) / 2;
+
+      // Draw logo
+      if (logoLoaded) {
+        const logoX = (cssW - logoWidth) / 2;
+        ctx.drawImage(logoImg, logoX, blockStartY, logoWidth, logoHeight);
+      }
+
+      // Draw text below logo
+      const textStartY = blockStartY + (logoLoaded ? logoHeight + logoGap : 0) + lineHeight / 2;
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], cssW / 2, startY + i * lineHeight);
+        ctx.fillText(lines[i], cssW / 2, textStartY + i * lineHeight);
       }
     };
 
     const loop = () => {
       mouse.prevSmX = mouse.smoothX;
       mouse.prevSmY = mouse.smoothY;
-      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.25;
-      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.25;
+      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.15;
+      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.15;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
       emitParticles();
@@ -162,7 +182,7 @@ export default function HeroSection() {
 
       // 1. Fill solid background
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#F5F5F5';
+      ctx.fillStyle = '#e4ded6';
       ctx.fillRect(0, 0, cssW, cssH);
 
       // 2. Draw text onto the overlay (so it gets erased with the overlay)
@@ -170,8 +190,8 @@ export default function HeroSection() {
 
       // 3. Cut holes where particles are
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.shadowColor = 'rgba(0,0,0,1)';
-      ctx.shadowBlur = 25;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(0,0,0,1)';
 
       for (const p of particles) {
@@ -211,7 +231,7 @@ export default function HeroSection() {
         height: '100vh',
         overflow: 'hidden',
         touchAction: 'none',
-        backgroundColor: '#224F3C',
+        backgroundColor: '#e4ded6',
         cursor: 'none',
       }}
     >
