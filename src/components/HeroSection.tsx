@@ -54,6 +54,15 @@ export default function HeroSection() {
       mouse.y = e.clientY - r.top;
     };
 
+    const onTouchMove = (e: TouchEvent) => {
+      if (!container) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const r = container.getBoundingClientRect();
+      mouse.x = touch.clientX - r.left;
+      mouse.y = touch.clientY - r.top;
+    };
+
     const updateSize = () => {
       if (svgRef.current && container) {
         const w = container.offsetWidth;
@@ -84,12 +93,14 @@ export default function HeroSection() {
     };
 
     window.addEventListener('mousemove', onMouseMove);
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('resize', updateSize);
     updateSize();
     loop();
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
+      container.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
