@@ -103,7 +103,7 @@ export default function HeroSection() {
         width: '100%',
         height: '100vh',
         overflow: 'hidden',
-        backgroundColor: '#224F3C',
+        backgroundColor: '#F5F5F5',
         cursor: 'none',
       }}
     >
@@ -178,7 +178,7 @@ export default function HeroSection() {
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             fontSize: 'clamp(2.5rem, 8vw, 7rem)',
             fontWeight: 800,
-            color: '#FFFFFF',
+            color: '#343835',
             textAlign: 'center',
             lineHeight: 1.05,
             letterSpacing: '-0.03em',
@@ -195,7 +195,7 @@ export default function HeroSection() {
             fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
             fontSize: 'clamp(1rem, 2vw, 1.5rem)',
             fontWeight: 400,
-            color: 'rgba(255,255,255,0.7)',
+            color: 'rgba(52,56,53,0.6)',
             textAlign: 'center',
             marginTop: '1.5rem',
             letterSpacing: '0.05em',
@@ -211,10 +211,10 @@ export default function HeroSection() {
         ref={cursorRef}
         style={{
           position: 'absolute',
-          top: -8,
-          left: -8,
-          width: 16,
-          height: 16,
+          top: -24,
+          left: -24,
+          width: 48,
+          height: 48,
           borderRadius: '50%',
           border: '2px solid rgba(255,255,255,0.8)',
           pointerEvents: 'none',
