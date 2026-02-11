@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 
@@ -41,6 +41,19 @@ export default function HeroSection() {
   const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0 });
   const particlesRef = useRef<Particle[]>([]);
   const rafRef = useRef<number>();
+  const isTouchRef = useRef(false);
+
+  // React touch handlers on the top-level overlay div
+  const handleTouchEvent = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isTouchRef.current = true;
+    const touch = e.touches[0];
+    if (!touch || !containerRef.current) return;
+    const r = containerRef.current.getBoundingClientRect();
+    mouseRef.current.x = touch.clientX - r.left;
+    mouseRef.current.y = touch.clientY - r.top;
+  }, []);
 
   useEffect(() => {
     const mouse = mouseRef.current;
@@ -52,17 +65,6 @@ export default function HeroSection() {
       const r = container.getBoundingClientRect();
       mouse.x = e.clientX - r.left;
       mouse.y = e.clientY - r.top;
-    };
-
-    const handleTouch = (e: TouchEvent) => {
-      if (!container) return;
-      const touch = e.touches[0];
-      if (!touch) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const r = container.getBoundingClientRect();
-      mouse.x = touch.clientX - r.left;
-      mouse.y = touch.clientY - r.top;
     };
 
     const updateSize = () => {
@@ -86,9 +88,8 @@ export default function HeroSection() {
         maskGroupRef.current?.prepend(p.el);
       }
 
-      const isTouchDevice = 'ontouchstart' in window;
       if (cursorRef.current) {
-        cursorRef.current.style.display = isTouchDevice ? 'none' : 'block';
+        cursorRef.current.style.display = isTouchRef.current ? 'none' : 'block';
         cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
       }
 
@@ -96,18 +97,13 @@ export default function HeroSection() {
       rafRef.current = requestAnimationFrame(loop);
     };
 
-    // Use document-level touch listeners to avoid child elements intercepting
     window.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('touchstart', handleTouch, { passive: false });
-    document.addEventListener('touchmove', handleTouch, { passive: false });
     window.addEventListener('resize', updateSize);
     updateSize();
     loop();
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('touchstart', handleTouch);
-      document.removeEventListener('touchmove', handleTouch);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
@@ -227,13 +223,16 @@ export default function HeroSection() {
         }}
       />
 
-      {/* Transparent touch capture layer — ensures no child element steals touch events */}
+      {/* Touch capture overlay — sits on top of everything to catch all touch events */}
       <div
+        onTouchStart={handleTouchEvent}
+        onTouchMove={handleTouchEvent}
         style={{
           position: 'absolute',
           inset: 0,
-          zIndex: 100,
+          zIndex: 200,
           background: 'transparent',
+          touchAction: 'none',
         }}
       />
     </section>
