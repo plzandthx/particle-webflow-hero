@@ -65,8 +65,8 @@ export default function HeroSection() {
     };
 
     const loop = () => {
-      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.45;
-      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.45;
+      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.25;
+      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.25;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
       if (mouse.diff > 0.005) {
