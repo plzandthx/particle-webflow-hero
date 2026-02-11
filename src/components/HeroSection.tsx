@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
+import heroLogoPng from '../assets/hero-logo.png';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -52,7 +53,6 @@ export default function HeroSection() {
   }, []);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
     isTouchRef.current = true;
     const touch = e.touches[0];
     if (!touch || !containerRef.current) return;
@@ -61,7 +61,6 @@ export default function HeroSection() {
   }, [snapMouseTo]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
     const touch = e.touches[0];
     if (!touch || !containerRef.current) return;
     const r = containerRef.current.getBoundingClientRect();
@@ -81,7 +80,7 @@ export default function HeroSection() {
 
     // Preload logo image
     const logoImg = new Image();
-    logoImg.src = import.meta.env.BASE_URL + 'images/hero-logo.png';
+    logoImg.src = heroLogoPng;
     let logoLoaded = false;
     logoImg.onload = () => { logoLoaded = true; };
 
@@ -275,7 +274,7 @@ export default function HeroSection() {
         width: '100%',
         height: '100vh',
         overflow: 'hidden',
-        touchAction: 'none',
+        touchAction: 'pan-y',
         backgroundColor: '#e4ded6',
         cursor: 'none',
       }}
@@ -339,7 +338,7 @@ export default function HeroSection() {
           inset: 0,
           zIndex: 200,
           background: 'transparent',
-          touchAction: 'none',
+          touchAction: 'pan-y',
         }}
       />
     </section>

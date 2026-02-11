@@ -24,5 +24,6 @@ export default defineConfig({
       },
     },
     cssCodeSplit: false,
+    assetsInlineLimit: 200000,
   },
 });
