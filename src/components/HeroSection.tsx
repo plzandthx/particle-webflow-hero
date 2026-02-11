@@ -169,7 +169,7 @@ export default function HeroSection() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 15,
+          zIndex: 5,
           pointerEvents: 'none',
         }}
       >
