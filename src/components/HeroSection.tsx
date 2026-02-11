@@ -4,6 +4,7 @@ import { LiquidMetal } from '@paper-design/shaders-react';
 
 interface Mouse {
   x: number; y: number; smoothX: number; smoothY: number; diff: number;
+  prevSmX: number; prevSmY: number;
 }
 
 interface ParticleData {
@@ -18,7 +19,7 @@ export default function HeroSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
 
-  const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0 });
+  const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0, prevSmX: 0, prevSmY: 0 });
   const particlesRef = useRef<ParticleData[]>([]);
   const rafRef = useRef<number>();
   const isTouchRef = useRef(false);
@@ -43,6 +44,9 @@ export default function HeroSection() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let cssW = container.offsetWidth;
+    let cssH = container.offsetHeight;
+
     const onMouseMove = (e: MouseEvent) => {
       if (!container) return;
       const r = container.getBoundingClientRect();
@@ -53,59 +57,100 @@ export default function HeroSection() {
     const updateSize = () => {
       if (!container || !canvas) return;
       const dpr = window.devicePixelRatio || 1;
-      const w = container.offsetWidth;
-      const h = container.offsetHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = w + 'px';
-      canvas.style.height = h + 'px';
+      cssW = container.offsetWidth;
+      cssH = container.offsetHeight;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
-    const emitParticle = () => {
-      if (mouse.diff > 0.005) {
-        const obj = { size: mouse.diff * 0.3 };
-        const p: ParticleData = {
-          x: mouse.smoothX,
-          y: mouse.smoothY,
-          obj,
-          tl: gsap.timeline(),
-        };
-        const peakSize = obj.size * 2.5;
-        p.tl.to(obj, { size: peakSize, ease: 'power1.inOut', duration: 2 });
-        p.tl.to(obj, { size: 0, ease: 'power4.in', duration: 4 }, 3);
-        p.tl.call(() => {
-          const i = particles.indexOf(p);
-          if (i > -1) particles.splice(i, 1);
-        });
-        particles.push(p);
+    const addParticle = (x: number, y: number, size: number) => {
+      const obj = { size };
+      const p: ParticleData = { x, y, obj, tl: gsap.timeline() };
+      const peakSize = size * 2.5;
+      p.tl.to(obj, { size: peakSize, ease: 'power1.inOut', duration: 2 });
+      p.tl.to(obj, { size: 0, ease: 'power4.in', duration: 4 }, 3);
+      p.tl.call(() => {
+        const i = particles.indexOf(p);
+        if (i > -1) particles.splice(i, 1);
+      });
+      particles.push(p);
+    };
+
+    const emitParticles = () => {
+      if (mouse.diff < 0.005) return;
+
+      // Interpolate between previous and current smooth positions for organic strokes
+      const dx = mouse.smoothX - mouse.prevSmX;
+      const dy = mouse.smoothY - mouse.prevSmY;
+      const dist = Math.hypot(dx, dy);
+      const baseSize = mouse.diff * 0.3;
+      const step = Math.max(baseSize * 0.4, 3); // spacing between interpolated particles
+
+      if (dist > 1) {
+        const steps = Math.ceil(dist / step);
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const px = mouse.prevSmX + dx * t;
+          const py = mouse.prevSmY + dy * t;
+          addParticle(px, py, baseSize);
+        }
+      } else {
+        addParticle(mouse.smoothX, mouse.smoothY, baseSize);
       }
     };
 
+    // Precompute text layout for drawing on canvas
+    const headline1 = 'Building something';
+    const headline2 = 'special at SurveyMonkey';
+
+    const drawTextOnCanvas = () => {
+      // Calculate responsive font size matching clamp(2.5rem, 8vw, 7rem)
+      const vwSize = cssW * 0.08;
+      const fontSize = Math.max(40, Math.min(vwSize, 112));
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.font = `400 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
+      ctx.fillStyle = '#343835';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const lineHeight = fontSize * 1.05;
+      const centerX = cssW / 2;
+      const centerY = cssH / 2;
+
+      ctx.fillText(headline1, centerX, centerY - lineHeight * 0.5);
+      ctx.fillText(headline2, centerX, centerY + lineHeight * 0.5);
+    };
+
     const loop = () => {
-      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.25;
-      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.25;
+      mouse.prevSmX = mouse.smoothX;
+      mouse.prevSmY = mouse.smoothY;
+      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.35;
+      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.35;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
-      emitParticle();
+      emitParticles();
 
       if (cursorRef.current) {
         cursorRef.current.style.display = isTouchRef.current ? 'none' : 'block';
         cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
       }
 
-      // Draw solid overlay, then erase particle holes
-      const w = container.offsetWidth;
-      const h = container.offsetHeight;
-
+      // 1. Fill solid background
       ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = '#F5F5F5';
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(0, 0, cssW, cssH);
 
-      // Cut holes where particles are — gooey effect via large shadowBlur
+      // 2. Draw text onto the overlay (so it gets erased with the overlay)
+      drawTextOnCanvas();
+
+      // 3. Cut holes where particles are
       ctx.globalCompositeOperation = 'destination-out';
       ctx.shadowColor = 'rgba(0,0,0,1)';
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 25;
       ctx.fillStyle = 'rgba(0,0,0,1)';
 
       for (const p of particles) {
@@ -170,39 +215,7 @@ export default function HeroSection() {
         />
       </div>
 
-      {/* Layer 1: Text (below the overlay, gets hidden by it) */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2,
-          pointerEvents: 'none',
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
-            fontSize: 'clamp(2.5rem, 8vw, 7rem)',
-            fontWeight: 400,
-            color: '#343835',
-            textAlign: 'center',
-            lineHeight: 1.05,
-            letterSpacing: '-0.03em',
-            margin: 0,
-            padding: '0 1rem',
-          }}
-        >
-          Building something
-          <br />
-          special at SurveyMonkey
-        </h1>
-      </div>
-
-      {/* Layer 2: Canvas overlay — solid #F5F5F5 with holes cut out by particles */}
+      {/* Layer 1: Canvas overlay — solid #F5F5F5 + text, with holes cut by particles */}
       <canvas
         ref={canvasRef}
         style={{
