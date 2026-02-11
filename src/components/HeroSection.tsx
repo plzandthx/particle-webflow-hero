@@ -106,10 +106,28 @@ export default function HeroSection() {
     const headline1 = 'Building something';
     const headline2 = 'special at SurveyMonkey';
 
+    const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const testLine = currentLine + ' ' + words[i];
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth) {
+          lines.push(currentLine);
+          currentLine = words[i];
+        } else {
+          currentLine = testLine;
+        }
+      }
+      lines.push(currentLine);
+      return lines;
+    };
+
     const drawTextOnCanvas = () => {
-      // Calculate responsive font size matching clamp(2.5rem, 8vw, 7rem)
       const vwSize = cssW * 0.08;
-      const fontSize = Math.max(40, Math.min(vwSize, 112));
+      const fontSize = Math.max(28, Math.min(vwSize, 112));
+      const maxTextWidth = cssW * 0.85;
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.font = `400 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
@@ -117,19 +135,22 @@ export default function HeroSection() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      const lineHeight = fontSize * 1.05;
-      const centerX = cssW / 2;
-      const centerY = cssH / 2;
+      const fullText = 'Building something special at SurveyMonkey';
+      const lines = wrapText(fullText, maxTextWidth, fontSize);
+      const lineHeight = fontSize * 1.15;
+      const totalHeight = lines.length * lineHeight;
+      const startY = (cssH - totalHeight) / 2 + lineHeight / 2;
 
-      ctx.fillText(headline1, centerX, centerY - lineHeight * 0.5);
-      ctx.fillText(headline2, centerX, centerY + lineHeight * 0.5);
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], cssW / 2, startY + i * lineHeight);
+      }
     };
 
     const loop = () => {
       mouse.prevSmX = mouse.smoothX;
       mouse.prevSmY = mouse.smoothY;
-      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.35;
-      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.35;
+      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.25;
+      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.25;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
       emitParticles();
