@@ -11,6 +11,8 @@ function mount() {
     console.warn(`[ParticleRevealHero] No element with id="${MOUNT_ID}" found.`);
     return;
   }
+  if (container.dataset.mounted === 'true') return;
+  container.dataset.mounted = 'true';
   // Reset container styles
   container.style.margin = '0';
   container.style.padding = '0';

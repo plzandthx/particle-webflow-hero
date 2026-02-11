@@ -41,6 +41,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build Webflow bundle
+        run: npm run build:webflow
+
+      - name: Copy Webflow bundle into dist
+        run: cp dist-webflow/particle-reveal-hero.iife.js dist/particle-reveal-hero.iife.js
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
