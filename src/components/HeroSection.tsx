@@ -20,13 +20,31 @@ export default function HeroSection() {
   const cursorRef = useRef<HTMLDivElement>(null);
 
   const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0, prevSmX: 0, prevSmY: 0 });
+  const hasFirstInputRef = useRef(false);
   const particlesRef = useRef<ParticleData[]>([]);
   const rafRef = useRef<number>();
   const isTouchRef = useRef(false);
 
-  const updateMouseFromTouch = useCallback((e: React.TouchEvent) => {
+  const snapMouseTo = useCallback((x: number, y: number) => {
+    const m = mouseRef.current;
+    m.x = x; m.y = y;
+    m.smoothX = x; m.smoothY = y;
+    m.prevSmX = x; m.prevSmY = y;
+    m.diff = 0;
+    hasFirstInputRef.current = true;
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     isTouchRef.current = true;
+    const touch = e.touches[0];
+    if (!touch || !containerRef.current) return;
+    const r = containerRef.current.getBoundingClientRect();
+    snapMouseTo(touch.clientX - r.left, touch.clientY - r.top);
+  }, [snapMouseTo]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
     const touch = e.touches[0];
     if (!touch || !containerRef.current) return;
     const r = containerRef.current.getBoundingClientRect();
@@ -56,8 +74,17 @@ export default function HeroSection() {
     const onMouseMove = (e: MouseEvent) => {
       if (!container) return;
       const r = container.getBoundingClientRect();
-      mouse.x = e.clientX - r.left;
-      mouse.y = e.clientY - r.top;
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      if (!hasFirstInputRef.current) {
+        hasFirstInputRef.current = true;
+        mouse.smoothX = mx;
+        mouse.smoothY = my;
+        mouse.prevSmX = mx;
+        mouse.prevSmY = my;
+      }
+      mouse.x = mx;
+      mouse.y = my;
     };
 
     const updateSize = () => {
@@ -286,8 +313,8 @@ export default function HeroSection() {
 
       {/* Touch capture overlay */}
       <div
-        onTouchStart={updateMouseFromTouch}
-        onTouchMove={updateMouseFromTouch}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         style={{
           position: 'absolute',
           inset: 0,
