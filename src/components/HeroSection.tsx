@@ -38,18 +38,29 @@ class Particle {
 
 export default function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const maskGroupRef = useRef<SVGGElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const shaderContainerRef = useRef<HTMLDivElement>(null);
 
   const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0 });
-  const particlesRef = useRef<Particle[]>([]);
+  const particlesRef = useRef<{ x: number; y: number; size: number; tl: gsap.core.Timeline; obj: { size: number } }[]>([]);
   const rafRef = useRef<number>();
 
   useEffect(() => {
     const mouse = mouseRef.current;
     const particles = particlesRef.current;
     const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas || !container) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const updateSize = () => {
+      if (!container || !canvas) return;
+      canvas.width = container.offsetWidth;
+      canvas.height = container.offsetHeight;
+    };
 
     const onMouseMove = (e: MouseEvent) => {
       if (!container) return;
@@ -58,10 +69,18 @@ export default function HeroSection() {
       mouse.y = e.clientY - r.top;
     };
 
-    const updateSize = () => {
-      if (svgRef.current && container) {
-        svgRef.current.setAttribute('width', container.offsetWidth.toString());
-        svgRef.current.setAttribute('height', container.offsetHeight.toString());
+    const emitParticle = () => {
+      if (mouse.diff > 0.01) {
+        const obj = { size: mouse.diff * 0.2 };
+        const p = { x: mouse.smoothX, y: mouse.smoothY, size: obj.size, obj, tl: gsap.timeline() };
+        const targetSize = obj.size * 2;
+        p.tl.to(obj, { size: targetSize, ease: 'power1.inOut', duration: 2 });
+        p.tl.to(obj, { size: 0, ease: 'power4.in', duration: 4 }, 3);
+        p.tl.call(() => {
+          const i = particles.indexOf(p);
+          if (i > -1) particles.splice(i, 1);
+        });
+        particles.push(p);
       }
     };
 
@@ -70,17 +89,41 @@ export default function HeroSection() {
       mouse.smoothY += (mouse.y - mouse.smoothY) * 0.1;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
-      if (mouse.diff > 0.01) {
-        const p = new Particle(mouse.smoothX, mouse.smoothY, mouse.diff * 0.2, particles);
-        particles.push(p);
-        maskGroupRef.current?.prepend(p.el);
-      }
+      emitParticle();
 
       if (cursorRef.current) {
         cursorRef.current.style.transform = `translate(${mouse.smoothX}px, ${mouse.smoothY}px)`;
       }
 
-      particles.forEach((p) => p.render());
+      // Draw mask on canvas: black = hidden, white = revealed
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Apply gooey effect via heavy blur + threshold-like contrast
+      ctx.filter = 'blur(25px) contrast(30)';
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#fff';
+      for (const p of particles) {
+        const s = p.obj.size;
+        if (s > 0.1) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.filter = 'none';
+
+      // Apply the canvas as a CSS mask on the shader container
+      if (shaderContainerRef.current) {
+        const dataUrl = canvas.toDataURL();
+        shaderContainerRef.current.style.maskImage = `url(${dataUrl})`;
+        shaderContainerRef.current.style.webkitMaskImage = `url(${dataUrl})`;
+        shaderContainerRef.current.style.maskSize = '100% 100%';
+        shaderContainerRef.current.style.webkitMaskSize = '100% 100%';
+      }
+
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -93,6 +136,8 @@ export default function HeroSection() {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      particles.forEach(p => p.tl.kill());
+      particles.length = 0;
     };
   }, []);
 
@@ -108,13 +153,12 @@ export default function HeroSection() {
         cursor: 'none',
       }}
     >
-      {/* Layer 1: Liquid Metal shader (revealed through mask) */}
+      {/* Layer 1: Liquid Metal shader — masked by canvas */}
       <div
+        ref={shaderContainerRef}
         style={{
           position: 'absolute',
           inset: 0,
-          clipPath: 'url(#particle-clip)',
-          WebkitClipPath: 'url(#particle-clip)',
           zIndex: 10,
         }}
       >
@@ -140,6 +184,12 @@ export default function HeroSection() {
           }}
         />
       </div>
+
+      {/* Hidden canvas for mask generation */}
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none', opacity: 0 }}
+      />
 
       {/* Layer 2: Text overlay */}
       <div
@@ -202,29 +252,6 @@ export default function HeroSection() {
           zIndex: 50,
         }}
       />
-
-      {/* SVG mask driven by particles */}
-      <svg
-        ref={svgRef}
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-        style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}
-        width="100"
-        height="100"
-      >
-        <defs>
-          <filter id="gooey-filter">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="25" />
-            <feColorMatrix
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -7"
-            />
-          </filter>
-          <clipPath id="particle-clip">
-            <g ref={maskGroupRef} filter="url(#gooey-filter)" />
-          </clipPath>
-        </defs>
-      </svg>
     </section>
   );
 }
