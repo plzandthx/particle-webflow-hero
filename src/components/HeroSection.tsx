@@ -189,10 +189,11 @@ export default function HeroSection() {
       // 2. Draw text onto the overlay (so it gets erased with the overlay)
       drawTextOnCanvas();
 
-      // 3. Cut holes where particles are — apply blur for gooey merging effect
+      // 3. Cut holes where particles are
       ctx.globalCompositeOperation = 'destination-out';
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(0,0,0,1)';
-      ctx.filter = 'blur(8px)';
 
       for (const p of particles) {
         const s = p.obj.size;
@@ -203,7 +204,7 @@ export default function HeroSection() {
         }
       }
 
-      ctx.filter = 'none';
+      ctx.shadowBlur = 0;
 
       rafRef.current = requestAnimationFrame(loop);
     };
