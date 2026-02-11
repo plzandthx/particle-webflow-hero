@@ -2,6 +2,23 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 
+class ShaderErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 interface Mouse {
   x: number; y: number; smoothX: number; smoothY: number; diff: number;
   prevSmX: number; prevSmY: number;
@@ -64,7 +81,7 @@ export default function HeroSection() {
 
     // Preload logo image
     const logoImg = new Image();
-    logoImg.src = '/images/hero-logo.png';
+    logoImg.src = import.meta.env.BASE_URL + 'images/hero-logo.png';
     let logoLoaded = false;
     logoImg.onload = () => { logoLoaded = true; };
 
@@ -264,25 +281,27 @@ export default function HeroSection() {
       }}
     >
       {/* Layer 0: Liquid Metal shader (always visible underneath) */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
-        <LiquidMetal
-          speed={1}
-          softness={0.1}
-          repetition={2}
-          shiftRed={-0.08}
-          shiftBlue={0}
-          distortion={0.07}
-          contour={0.4}
-          scale={0.34}
-          rotation={0}
-          shape="diamond"
-          angle={70}
-          image="https://workers.paper.design/file-assets/01KG192RZYT5JJA51WGJAQAPB1/01KG19A6K85VMBYSNTEEPCYHES.svg"
-          colorBack="#00000000"
-          colorTint="#00BF6F"
-          style={{ width: '100%', height: '100%', backgroundColor: '#224F3C' }}
-        />
-      </div>
+      <ShaderErrorBoundary>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+          <LiquidMetal
+            speed={1}
+            softness={0.1}
+            repetition={2}
+            shiftRed={-0.08}
+            shiftBlue={0}
+            distortion={0.07}
+            contour={0.4}
+            scale={0.34}
+            rotation={0}
+            shape="diamond"
+            angle={70}
+            image="https://workers.paper.design/file-assets/01KG192RZYT5JJA51WGJAQAPB1/01KG19A6K85VMBYSNTEEPCYHES.svg"
+            colorBack="#00000000"
+            colorTint="#00BF6F"
+            style={{ width: '100%', height: '100%', backgroundColor: '#224F3C' }}
+          />
+        </div>
+      </ShaderErrorBoundary>
 
       {/* Layer 1: Canvas overlay — solid #F5F5F5 + text, with holes cut by particles */}
       <canvas
