@@ -146,10 +146,11 @@ export default function HeroSection() {
       const lineHeight = fontSize * 1.15;
       const totalTextHeight = lines.length * lineHeight;
 
-      // Logo dimensions
-      const logoHeight = fontSize * 1.2;
+      // Logo dimensions — 1.5x on mobile (<768px)
+      const isMobile = cssW < 768;
+      const logoHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
       const logoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
-      const logoGap = fontSize * 0.4;
+      const logoGap = fontSize * 0.8;
       const totalBlockHeight = (logoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
       const blockStartY = (cssH - totalBlockHeight) / 2;
 
