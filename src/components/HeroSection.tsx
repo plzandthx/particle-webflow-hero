@@ -175,9 +175,9 @@ export default function HeroSection() {
       >
         <h1
           style={{
-            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+            fontFamily: "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
             fontSize: 'clamp(2.5rem, 8vw, 7rem)',
-            fontWeight: 800,
+            fontWeight: 400,
             color: '#343835',
             textAlign: 'center',
             lineHeight: 1.05,
