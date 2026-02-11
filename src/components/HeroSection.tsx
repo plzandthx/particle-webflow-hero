@@ -186,24 +186,10 @@ export default function HeroSection() {
             padding: '0 1rem',
           }}
         >
-          Your Brand
+          Building something
           <br />
-          Here
+          special at SurveyMonkey
         </h1>
-        <p
-          style={{
-            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-            fontSize: 'clamp(1rem, 2vw, 1.5rem)',
-            fontWeight: 400,
-            color: 'rgba(52,56,53,0.6)',
-            textAlign: 'center',
-            marginTop: '1.5rem',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Move your cursor to reveal
-        </p>
       </div>
 
       {/* Custom cursor */}
