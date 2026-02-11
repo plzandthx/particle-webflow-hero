@@ -56,8 +56,10 @@ export default function HeroSection() {
 
     const handleTouch = (e: TouchEvent) => {
       if (!container) return;
-      e.preventDefault();
       const touch = e.touches[0];
+      if (!touch) return;
+      e.preventDefault();
+      e.stopPropagation();
       const r = container.getBoundingClientRect();
       mouse.x = touch.clientX - r.left;
       mouse.y = touch.clientY - r.top;
@@ -94,17 +96,18 @@ export default function HeroSection() {
       rafRef.current = requestAnimationFrame(loop);
     };
 
+    // Use document-level touch listeners to avoid child elements intercepting
     window.addEventListener('mousemove', onMouseMove);
-    container.addEventListener('touchstart', handleTouch, { passive: false });
-    container.addEventListener('touchmove', handleTouch, { passive: false });
+    document.addEventListener('touchstart', handleTouch, { passive: false });
+    document.addEventListener('touchmove', handleTouch, { passive: false });
     window.addEventListener('resize', updateSize);
     updateSize();
     loop();
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
-      container.removeEventListener('touchstart', handleTouch);
-      container.removeEventListener('touchmove', handleTouch);
+      document.removeEventListener('touchstart', handleTouch);
+      document.removeEventListener('touchmove', handleTouch);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
@@ -221,6 +224,16 @@ export default function HeroSection() {
           border: '2px solid rgba(255,255,255,0.8)',
           pointerEvents: 'none',
           zIndex: 50,
+        }}
+      />
+
+      {/* Transparent touch capture layer — ensures no child element steals touch events */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 100,
+          background: 'transparent',
         }}
       />
     </section>
