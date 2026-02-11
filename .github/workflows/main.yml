@@ -1,0 +1,2 @@
+npm install
+npx vite build --config vite.config.webflow.ts
