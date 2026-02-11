@@ -65,18 +65,18 @@ export default function HeroSection() {
     };
 
     const loop = () => {
-      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.1;
-      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.1;
+      mouse.smoothX += (mouse.x - mouse.smoothX) * 0.45;
+      mouse.smoothY += (mouse.y - mouse.smoothY) * 0.45;
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
-      if (mouse.diff > 0.01) {
-        const p = new Particle(mouse.smoothX, mouse.smoothY, mouse.diff * 0.2, particles);
+      if (mouse.diff > 0.005) {
+        const p = new Particle(mouse.smoothX, mouse.smoothY, mouse.diff * 0.25, particles);
         particles.push(p);
         maskGroupRef.current?.prepend(p.el);
       }
 
       if (cursorRef.current) {
-        cursorRef.current.style.transform = `translate(${mouse.smoothX}px, ${mouse.smoothY}px)`;
+        cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
       }
 
       particles.forEach((p) => p.render());
