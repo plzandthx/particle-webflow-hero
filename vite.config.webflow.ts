@@ -5,6 +5,9 @@ import path from 'path';
 // Build config for standalone Webflow bundle
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'process.env.NODE_ENV': '"production"',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
