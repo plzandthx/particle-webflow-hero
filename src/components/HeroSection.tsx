@@ -224,7 +224,7 @@ export default function HeroSection() {
         : logoLoaded ? heroLogoWidth : smLogoWidth;
       const logoGap = fontSize * 0.8;
       const totalBlockHeight = (anyLogoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
-      const blockStartY = (cssH - totalBlockHeight) / 2;
+      const blockStartY = cssH * 0.4 - totalBlockHeight / 2;
 
       // Draw logos side by side, centered as a pair
       if (anyLogoLoaded) {
