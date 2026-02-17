@@ -93,6 +93,26 @@ export default function HeroSection() {
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
+    // Typewriter state
+    const typewriterFullText = 'Building something special at SurveyMonkey';
+    let twCharIndex = 0;
+    let twCursorVisible = true;
+    let twDoneAt = 0; // timestamp when typing finished (0 = still typing)
+    const twSpeed = 80; // ms per character
+    const twCursorHideDelay = 3000; // hide cursor 3s after typing completes
+
+    const twTypingInterval = setInterval(() => {
+      if (twCharIndex < typewriterFullText.length) {
+        twCharIndex++;
+      } else if (!twDoneAt) {
+        twDoneAt = Date.now();
+      }
+    }, twSpeed);
+
+    const twCursorInterval = setInterval(() => {
+      twCursorVisible = !twCursorVisible;
+    }, 500);
+
     const onMouseMove = (e: MouseEvent) => {
       if (!container) return;
       const r = container.getBoundingClientRect();
@@ -157,10 +177,6 @@ export default function HeroSection() {
       }
     };
 
-    // Precompute text layout for drawing on canvas
-    const headline1 = 'Building something';
-    const headline2 = 'special at SurveyMonkey';
-
     const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
       const words = text.split(' ');
       const lines: string[] = [];
@@ -190,17 +206,17 @@ export default function HeroSection() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      const fullText = 'Building something special at SurveyMonkey';
-      const lines = wrapText(fullText, maxTextWidth, fontSize);
+      // Use full text for stable layout sizing (prevents logos from jumping)
+      const fullLines = wrapText(typewriterFullText, maxTextWidth, fontSize);
       const lineHeight = fontSize * 1.15;
-      const totalTextHeight = lines.length * lineHeight;
+      const totalTextHeight = fullLines.length * lineHeight;
 
       // Logo dimensions — 1.5x on mobile (<768px)
       const isMobile = cssW < 768;
       const logoHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
       const heroLogoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
       const smLogoWidth = smLogoLoaded ? (smLogoImg.naturalWidth / smLogoImg.naturalHeight) * logoHeight : 0;
-      const logoPairGap = fontSize * 0.5; // gap between the two logos
+      const logoPairGap = fontSize * 0.5;
       const bothLogosLoaded = logoLoaded && smLogoLoaded;
       const anyLogoLoaded = logoLoaded || smLogoLoaded;
       const totalLogosWidth = bothLogosLoaded
@@ -223,10 +239,23 @@ export default function HeroSection() {
         }
       }
 
-      // Draw text below logo
+      // Typewriter: draw only the revealed characters
+      const displayText = typewriterFullText.substring(0, twCharIndex);
+      const displayLines = wrapText(displayText, maxTextWidth, fontSize);
       const textStartY = blockStartY + (anyLogoLoaded ? logoHeight + logoGap : 0) + lineHeight / 2;
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], cssW / 2, textStartY + i * lineHeight);
+
+      for (let i = 0; i < displayLines.length; i++) {
+        ctx.fillText(displayLines[i], cssW / 2, textStartY + i * lineHeight);
+      }
+
+      // Blinking cursor after last typed character
+      const showCursor = twCursorVisible && (!twDoneAt || Date.now() - twDoneAt < twCursorHideDelay);
+      if (showCursor && displayLines.length > 0) {
+        const lastLine = displayLines[displayLines.length - 1];
+        const lastLineWidth = ctx.measureText(lastLine).width;
+        const cursorX = cssW / 2 + lastLineWidth / 2 + 4;
+        const cursorY = textStartY + (displayLines.length - 1) * lineHeight;
+        ctx.fillText('|', cursorX, cursorY);
       }
     };
 
@@ -281,6 +310,8 @@ export default function HeroSection() {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      clearInterval(twTypingInterval);
+      clearInterval(twCursorInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
     };
