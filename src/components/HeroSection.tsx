@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
+import smLogoPillPng from '../assets/sm-logo-pill.png';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -78,11 +79,16 @@ export default function HeroSection() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Preload logo image
+    // Preload logo images
     const logoImg = new Image();
     logoImg.src = heroLogoPng;
     let logoLoaded = false;
     logoImg.onload = () => { logoLoaded = true; };
+
+    const smLogoImg = new Image();
+    smLogoImg.src = smLogoPillPng;
+    let smLogoLoaded = false;
+    smLogoImg.onload = () => { smLogoLoaded = true; };
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -192,19 +198,33 @@ export default function HeroSection() {
       // Logo dimensions — 1.5x on mobile (<768px)
       const isMobile = cssW < 768;
       const logoHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
-      const logoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
+      const heroLogoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
+      const smLogoWidth = smLogoLoaded ? (smLogoImg.naturalWidth / smLogoImg.naturalHeight) * logoHeight : 0;
+      const logoPairGap = fontSize * 0.5; // gap between the two logos
+      const bothLogosLoaded = logoLoaded && smLogoLoaded;
+      const anyLogoLoaded = logoLoaded || smLogoLoaded;
+      const totalLogosWidth = bothLogosLoaded
+        ? heroLogoWidth + logoPairGap + smLogoWidth
+        : logoLoaded ? heroLogoWidth : smLogoWidth;
       const logoGap = fontSize * 0.8;
-      const totalBlockHeight = (logoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
+      const totalBlockHeight = (anyLogoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
       const blockStartY = (cssH - totalBlockHeight) / 2;
 
-      // Draw logo
-      if (logoLoaded) {
-        const logoX = (cssW - logoWidth) / 2;
-        ctx.drawImage(logoImg, logoX, blockStartY, logoWidth, logoHeight);
+      // Draw logos side by side, centered as a pair
+      if (anyLogoLoaded) {
+        const pairX = (cssW - totalLogosWidth) / 2;
+        let offsetX = pairX;
+        if (logoLoaded) {
+          ctx.drawImage(logoImg, offsetX, blockStartY, heroLogoWidth, logoHeight);
+          offsetX += heroLogoWidth + logoPairGap;
+        }
+        if (smLogoLoaded) {
+          ctx.drawImage(smLogoImg, offsetX, blockStartY, smLogoWidth, logoHeight);
+        }
       }
 
       // Draw text below logo
-      const textStartY = blockStartY + (logoLoaded ? logoHeight + logoGap : 0) + lineHeight / 2;
+      const textStartY = blockStartY + (anyLogoLoaded ? logoHeight + logoGap : 0) + lineHeight / 2;
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i], cssW / 2, textStartY + i * lineHeight);
       }
