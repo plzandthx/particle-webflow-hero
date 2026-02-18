@@ -348,7 +348,7 @@ export default function HeroSection() {
             image="https://workers.paper.design/file-assets/01KG192RZYT5JJA51WGJAQAPB1/01KG19A6K85VMBYSNTEEPCYHES.svg"
             colorBack="#00000000"
             colorTint="#00BF6F"
-            style={{ width: '100%', height: '100%', backgroundColor: '#224F3C' }}
+            style={{ width: '100%', height: '100%', backgroundColor: '#000000' }}
           />
         </div>
       </ShaderErrorBoundary>
