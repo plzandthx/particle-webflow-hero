@@ -241,6 +241,9 @@ export default function HeroSection() {
     logoImg.src = heroLogoPng;
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
+    // Append to DOM so the browser keeps decoding animated GIF frames
+    smLogoImg.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
+    document.body.appendChild(smLogoImg);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -492,6 +495,7 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
+      if (smLogoImg.parentNode) smLogoImg.parentNode.removeChild(smLogoImg);
     };
   }, []);
 
