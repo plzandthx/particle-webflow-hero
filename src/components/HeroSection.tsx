@@ -255,6 +255,12 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
+    // Preload GIF as a blob URL so we can trigger a fresh animation from frame 1
+    let gifBlobUrl: string | null = null;
+    fetch(smPillDashGif)
+      .then(r => r.blob())
+      .then(blob => { gifBlobUrl = URL.createObjectURL(blob); });
+
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
@@ -289,10 +295,11 @@ export default function HeroSection() {
       ease: 'none',
     });
 
-    // Start GIF animation right when SM logo begins to appear
+    // Start GIF animation right when SM logo begins to appear.
+    // Using blob URL forces a fresh decode from frame 1.
     masterTL.call(() => {
       if (smGifRef.current) {
-        smGifRef.current.src = smPillDashGif;
+        smGifRef.current.src = gifBlobUrl || smPillDashGif;
       }
     });
 
@@ -522,6 +529,7 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
+      if (gifBlobUrl) URL.revokeObjectURL(gifBlobUrl);
     };
   }, []);
 
@@ -572,8 +580,9 @@ export default function HeroSection() {
         }}
       />
 
-      {/* Hidden SM logo GIF — kept in DOM so browser decodes frames for canvas drawImage.
-           src is set by the GSAP timeline to sync GIF playback with the intro animation. */}
+      {/* SM logo GIF source — placed behind the shader (zIndex 0) so the browser
+           fully renders and animates it, but it's never visible to the user.
+           src is set by the GSAP timeline to sync playback with the intro animation. */}
       <img
         ref={smGifRef}
         alt=""
@@ -581,7 +590,7 @@ export default function HeroSection() {
           position: 'absolute',
           top: 0,
           left: 0,
-          clipPath: 'inset(100%)',
+          zIndex: 0,
           pointerEvents: 'none',
         }}
       />
