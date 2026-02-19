@@ -266,9 +266,12 @@ export default function HeroSection() {
 
     // Off-screen canvas for keying out black background from video frames
     const videoKeyCanvas = document.createElement('canvas');
-    videoKeyCanvas.width = 498;
-    videoKeyCanvas.height = 266;
-    const videoKeyCtx = videoKeyCanvas.getContext('2d', { willReadFrequently: true })!;
+    let videoKeyCtx: CanvasRenderingContext2D | null = null;
+    video.addEventListener('loadedmetadata', () => {
+      videoKeyCanvas.width = video.videoWidth;
+      videoKeyCanvas.height = video.videoHeight;
+      videoKeyCtx = videoKeyCanvas.getContext('2d', { willReadFrequently: true })!;
+    });
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -439,18 +442,21 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw current video frame with black background keyed to transparent
+            // Draw current video frame with black background removed
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            if (video.readyState >= 2) {
-              // Draw video frame to offscreen canvas and convert luminance → alpha
-              videoKeyCtx.clearRect(0, 0, 498, 266);
-              videoKeyCtx.drawImage(video, 0, 0, 498, 266);
-              const imgData = videoKeyCtx.getImageData(0, 0, 498, 266);
+            if (video.readyState >= 2 && videoKeyCtx) {
+              const vw = videoKeyCanvas.width;
+              const vh = videoKeyCanvas.height;
+              videoKeyCtx.clearRect(0, 0, vw, vh);
+              videoKeyCtx.drawImage(video, 0, 0, vw, vh);
+              const imgData = videoKeyCtx.getImageData(0, 0, vw, vh);
               const d = imgData.data;
               for (let i = 0; i < d.length; i += 4) {
-                // Use max channel as alpha so black → transparent, bright → opaque
-                d[i + 3] = Math.max(d[i], d[i + 1], d[i + 2]);
+                // Hard threshold: black/near-black → fully transparent, else fully opaque
+                if (d[i] < 30 && d[i + 1] < 30 && d[i + 2] < 30) {
+                  d[i + 3] = 0;
+                }
               }
               videoKeyCtx.putImageData(imgData, 0, 0);
               ctx.drawImage(videoKeyCanvas, el.x + xOffset, el.y, el.width, el.height);
