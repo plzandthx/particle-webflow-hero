@@ -482,20 +482,19 @@ export default function HeroSection() {
       const gs = gifStateRef.current;
       if (!gs.ready || !gs.playing || gs.finished || gs.frameStartTime === 0) return;
 
-      const elapsed = now - gs.frameStartTime;
-      const currentDelay = gs.delays[gs.currentFrame];
+      // Advance through all frames whose delay has elapsed (handles multiple per tick)
+      while (gs.currentFrame < gs.frames.length - 1) {
+        const elapsed = now - gs.frameStartTime;
+        if (elapsed < gs.delays[gs.currentFrame]) break;
+        gs.frameStartTime += gs.delays[gs.currentFrame];
+        gs.currentFrame++;
+      }
 
-      if (elapsed >= currentDelay) {
-        const nextFrame = gs.currentFrame + 1;
-        if (nextFrame >= gs.frames.length) {
-          // Animation complete — hold on last frame
-          gs.currentFrame = gs.frames.length - 1;
-          gs.playing = false;
-          gs.finished = true;
-        } else {
-          gs.currentFrame = nextFrame;
-          gs.frameStartTime = now;
-        }
+      // Check if we've reached the last frame
+      if (gs.currentFrame >= gs.frames.length - 1) {
+        gs.currentFrame = gs.frames.length - 1;
+        gs.playing = false;
+        gs.finished = true;
       }
     };
 
