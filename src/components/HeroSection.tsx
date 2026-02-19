@@ -264,6 +264,12 @@ export default function HeroSection() {
     video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
     document.body.appendChild(video);
 
+    // Off-screen canvas for keying out black background from video frames
+    const videoKeyCanvas = document.createElement('canvas');
+    videoKeyCanvas.width = 498;
+    videoKeyCanvas.height = 266;
+    const videoKeyCtx = videoKeyCanvas.getContext('2d', { willReadFrequently: true })!;
+
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
@@ -433,11 +439,21 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw current video frame onto canvas so particles erase it like other content
+            // Draw current video frame with black background keyed to transparent
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
             if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
+              // Draw video frame to offscreen canvas and convert luminance → alpha
+              videoKeyCtx.clearRect(0, 0, 498, 266);
+              videoKeyCtx.drawImage(video, 0, 0, 498, 266);
+              const imgData = videoKeyCtx.getImageData(0, 0, 498, 266);
+              const d = imgData.data;
+              for (let i = 0; i < d.length; i += 4) {
+                // Use max channel as alpha so black → transparent, bright → opaque
+                d[i + 3] = Math.max(d[i], d[i + 1], d[i + 2]);
+              }
+              videoKeyCtx.putImageData(imgData, 0, 0);
+              ctx.drawImage(videoKeyCanvas, el.x + xOffset, el.y, el.width, el.height);
             } else {
               // Fallback: draw static GIF image until video is ready
               ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
