@@ -379,7 +379,6 @@ export default function HeroSection() {
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.font = `400 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
-      ctx.fillStyle = '#343835';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
 
@@ -387,6 +386,20 @@ export default function HeroSection() {
       const elements = computeInlineLayout(
         ctx, logoImg, smLogoImg, fontSize, maxTextWidth, cssW, cssH, isMobile
       );
+
+      // Top-down gradient for text: find vertical bounds of text words
+      let textTopY = Infinity;
+      let textBottomY = -Infinity;
+      for (const el of elements) {
+        if (el.type === 'word') {
+          textTopY = Math.min(textTopY, el.y - fontSize / 2);
+          textBottomY = Math.max(textBottomY, el.y + fontSize / 2);
+        }
+      }
+      const textGradient = ctx.createLinearGradient(0, textTopY, 0, textBottomY);
+      textGradient.addColorStop(0, '#343835');
+      textGradient.addColorStop(1, '#857C72');
+      ctx.fillStyle = textGradient;
 
       const textChars = Math.floor(anim.textCharCount);
 
