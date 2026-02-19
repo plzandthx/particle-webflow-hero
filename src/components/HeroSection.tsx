@@ -289,6 +289,13 @@ export default function HeroSection() {
       ease: 'none',
     });
 
+    // Start GIF animation right when SM logo begins to appear
+    masterTL.call(() => {
+      if (smGifRef.current) {
+        smGifRef.current.src = smPillDashGif;
+      }
+    });
+
     // Phase 3: SM logo fades in with left-to-right shift
     masterTL.to(anim, {
       smLogoOpacity: 1, smLogoXOffset: 0,
@@ -565,20 +572,17 @@ export default function HeroSection() {
         }}
       />
 
-      {/* Hidden SM logo GIF — kept in DOM so browser animates frames for canvas drawImage */}
+      {/* Hidden SM logo GIF — kept in DOM so browser decodes frames for canvas drawImage.
+           src is set by the GSAP timeline to sync GIF playback with the intro animation. */}
       <img
         ref={smGifRef}
-        src={smPillDashGif}
         alt=""
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          width: 1,
-          height: 1,
-          opacity: 0,
+          clipPath: 'inset(100%)',
           pointerEvents: 'none',
-          zIndex: -1,
         }}
       />
 
