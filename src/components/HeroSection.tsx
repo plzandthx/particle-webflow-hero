@@ -256,21 +256,24 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
-    // Offscreen canvas for Lottie to render onto
-    const lottieCanvas = document.createElement('canvas');
-    lottieCanvas.width = 498;
-    lottieCanvas.height = 266;
+    // Hidden wrapper div for Lottie — it creates its own canvas inside
+    const lottieWrapper = document.createElement('div');
+    lottieWrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:498px;height:266px;pointer-events:none;overflow:hidden;';
+    document.body.appendChild(lottieWrapper);
     const lottieAnim = lottie.loadAnimation({
-      container: lottieCanvas as unknown as Element,
+      container: lottieWrapper,
       renderer: 'canvas',
       loop: false,
       autoplay: false,
       animationData: smPillDashLottie,
-      rendererSettings: {
-        context: lottieCanvas.getContext('2d')!,
-        clearCanvas: true,
-      },
     });
+    // Lottie creates the canvas synchronously — grab it
+    const lottieCanvas = lottieWrapper.querySelector('canvas')!;
+    // Manual frame control state
+    let lottieStartTime = 0;
+    let lottieIsPlaying = false;
+    const lottieFps = (smPillDashLottie as { fr: number }).fr;        // 60
+    const lottieTotalFrames = (smPillDashLottie as { op: number }).op; // 82.8
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -308,8 +311,9 @@ export default function HeroSection() {
 
     // Start Lottie playback when SM logo begins to appear
     masterTL.call(() => {
+      lottieIsPlaying = true;
+      lottieStartTime = performance.now();
       lottieAnim.goToAndStop(0, true);
-      lottieAnim.play();
     });
 
     // Phase 3: SM logo fades in with left-to-right shift
@@ -492,6 +496,16 @@ export default function HeroSection() {
 
       emitParticles();
 
+      // Manually advance Lottie to the correct frame
+      if (lottieIsPlaying) {
+        const elapsed = (performance.now() - lottieStartTime) / 1000;
+        const frame = Math.min(elapsed * lottieFps, lottieTotalFrames - 1);
+        lottieAnim.goToAndStop(frame, true);
+        if (frame >= lottieTotalFrames - 1) {
+          lottieIsPlaying = false;
+        }
+      }
+
       if (cursorRef.current) {
         cursorRef.current.style.display = isTouchRef.current ? 'none' : 'block';
         cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
@@ -539,6 +553,7 @@ export default function HeroSection() {
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
       lottieAnim.destroy();
+      if (lottieWrapper.parentNode) lottieWrapper.parentNode.removeChild(lottieWrapper);
     };
   }, []);
 
