@@ -437,6 +437,8 @@ export default function HeroSection() {
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
             if (video.readyState >= 2) {
+              ctx.fillStyle = '#e4ded6';
+              ctx.fillRect(el.x + xOffset, el.y, el.width, el.height);
               ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
             } else {
               // Fallback: draw static GIF image until video is ready
