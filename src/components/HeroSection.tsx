@@ -407,13 +407,7 @@ export default function HeroSection() {
           const opacity = isHero ? anim.heroLogoOpacity : anim.smLogoOpacity;
           const xOffset = isHero ? anim.heroLogoXOffset : anim.smLogoXOffset;
 
-          if (opacity <= 0) {
-            // Hide GIF overlay when SM logo not yet visible
-            if (!isHero && smGifRef.current) {
-              smGifRef.current.style.opacity = '0';
-            }
-            continue;
-          }
+          if (opacity <= 0) continue;
 
           if (isHero) {
             // Draw hero logo on canvas
@@ -423,13 +417,12 @@ export default function HeroSection() {
               ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
               ctx.globalAlpha = prevAlpha;
             }
-          } else if (smGifRef.current) {
-            // Position animated GIF overlay for SM logo (canvas can't play GIFs)
-            smGifRef.current.style.left = `${el.x + xOffset}px`;
-            smGifRef.current.style.top = `${el.y}px`;
-            smGifRef.current.style.width = `${el.width}px`;
-            smGifRef.current.style.height = `${el.height}px`;
-            smGifRef.current.style.opacity = `${opacity}`;
+          } else if (smGifRef.current && smGifRef.current.complete && smGifRef.current.naturalHeight > 0) {
+            // Draw current GIF frame onto canvas so particles erase it like other content
+            const prevAlpha = ctx.globalAlpha;
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(smGifRef.current, el.x + xOffset, el.y, el.width, el.height);
+            ctx.globalAlpha = prevAlpha;
           }
 
           // Set initial cursor position after hero logo (before any text)
@@ -572,16 +565,20 @@ export default function HeroSection() {
         }}
       />
 
-      {/* SM logo animated GIF overlay (canvas can't play animated GIFs) */}
+      {/* Hidden SM logo GIF — kept in DOM so browser animates frames for canvas drawImage */}
       <img
         ref={smGifRef}
         src={smPillDashGif}
         alt=""
         style={{
           position: 'absolute',
-          zIndex: 15,
-          pointerEvents: 'none',
+          top: 0,
+          left: 0,
+          width: 1,
+          height: 1,
           opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -1,
         }}
       />
 
