@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillPng from '../assets/sm-logo-pill.png';
-import smPillDashWebm from '../assets/sm-pill-dash.webm';
+import smPillDashGif from '../assets/sm-pill-dash.gif';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -66,127 +66,134 @@ function computeInlineLayout(
   logoImg: HTMLImageElement,
   smLogoImg: HTMLImageElement,
   fontSize: number,
-  maxWidth: number,
+  _maxWidth: number,
   canvasWidth: number,
   canvasHeight: number,
   isMobile: boolean,
 ): PositionedElement[] {
   const lineHeight = fontSize * 1.15;
   const imageHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
-  const imageGap = fontSize * 0.3;
   const spaceWidth = ctx.measureText(' ').width;
 
   // Known aspect ratios from actual image files
   const heroWidth = imageHeight * (298 / 190);
-  const smPadding = fontSize * 0.35; // spacing between pill and adjacent items
-  const smVisualWidth = imageHeight * (498 / 266); // actual pill aspect ratio
-  const smWidth = smVisualWidth + smPadding; // layout width includes spacing
+  const smVisualWidth = imageHeight * (498 / 266);
 
-  // Flow item type (local to layout computation)
-  type FlowItem = {
-    type: 'image' | 'word';
-    key: 'heroLogo' | 'smLogo' | 'text';
-    img?: HTMLImageElement;
-    text?: string;
-    itemWidth: number;
-    renderWidth: number;
-    height: number;
-    charStart?: number;
-    charEnd?: number;
+  // Explicit line definitions per breakpoint
+  // Desktop: [heroLogo] / "Building something special" / "at SurveyMonkey" / [smLogo]
+  // Mobile:  [heroLogo] / "Building" / "something special" / "at SurveyMonkey" / [smLogo]
+  const textLines: string[][] = isMobile
+    ? [['Building'], ['something', 'special'], ['at', 'SurveyMonkey']]
+    : [['Building', 'something', 'special'], ['at', 'SurveyMonkey']];
+
+  // Build explicit lines: first is the hero image, then text lines, then sm pill image
+  type LineDef = {
+    elements: {
+      type: 'image' | 'word';
+      key: 'heroLogo' | 'smLogo' | 'text';
+      img?: HTMLImageElement;
+      text?: string;
+      width: number;
+      height: number;
+      charStart?: number;
+      charEnd?: number;
+    }[];
+    contentWidth: number;
+    maxHeight: number;
   };
 
-  const flowItems: FlowItem[] = [];
+  const lines: LineDef[] = [];
 
-  // Segment 1: hero logo
-  flowItems.push({
-    type: 'image', key: 'heroLogo', img: logoImg,
-    itemWidth: heroWidth + imageGap, renderWidth: heroWidth, height: imageHeight,
+  // Line 1: hero logo alone
+  lines.push({
+    elements: [{ type: 'image', key: 'heroLogo', img: logoImg, width: heroWidth, height: imageHeight }],
+    contentWidth: heroWidth,
+    maxHeight: imageHeight,
   });
 
-  // Segment 2: all text words
-  const textWords = 'Building something special at SurveyMonkey'.split(' ');
+  // Text lines
   let charOff = 0;
-  for (const word of textWords) {
-    const w = ctx.measureText(word).width;
-    flowItems.push({
-      type: 'word', key: 'text', text: word,
-      itemWidth: w + spaceWidth, renderWidth: w, height: lineHeight,
-      charStart: charOff, charEnd: charOff + word.length,
-    });
-    charOff += word.length + 1;
+  const fullText = 'Building something special at SurveyMonkey';
+  const allWords = fullText.split(' ');
+  // Compute charStart for each word in the full string
+  const wordCharStarts: number[] = [];
+  let runOff = 0;
+  for (const w of allWords) {
+    wordCharStarts.push(runOff);
+    runOff += w.length + 1;
   }
 
-  // Segment 3: SM pill logo
-  flowItems.push({
-    type: 'image', key: 'smLogo', img: smLogoImg,
-    itemWidth: smWidth + imageGap, renderWidth: smVisualWidth, height: imageHeight,
+  let wordIdx = 0;
+  for (const wordsInLine of textLines) {
+    const lineElems: LineDef['elements'] = [];
+    let contentWidth = 0;
+    for (let wi = 0; wi < wordsInLine.length; wi++) {
+      const word = wordsInLine[wi];
+      const w = ctx.measureText(word).width;
+      charOff = wordCharStarts[wordIdx];
+      lineElems.push({
+        type: 'word', key: 'text', text: word, width: w, height: lineHeight,
+        charStart: charOff, charEnd: charOff + word.length,
+      });
+      contentWidth += w;
+      if (wi < wordsInLine.length - 1) contentWidth += spaceWidth;
+      wordIdx++;
+    }
+    lines.push({ elements: lineElems, contentWidth, maxHeight: lineHeight });
+  }
+
+  // Last line: SM pill alone
+  lines.push({
+    elements: [{ type: 'image', key: 'smLogo', img: smLogoImg, width: smVisualWidth, height: imageHeight }],
+    contentWidth: smVisualWidth,
+    maxHeight: imageHeight,
   });
 
-  // Flow layout: left-to-right with line wrapping
-  type FlowLine = { items: { item: FlowItem; x: number }[]; width: number; maxHeight: number };
-  const lines: FlowLine[] = [{ items: [], width: 0, maxHeight: lineHeight }];
-  let cursorX = 0;
-
-  for (const item of flowItems) {
-    if (cursorX + item.renderWidth > maxWidth && lines[lines.length - 1].items.length > 0) {
-      lines.push({ items: [], width: 0, maxHeight: lineHeight });
-      cursorX = 0;
-    }
-    const line = lines[lines.length - 1];
-    line.items.push({ item, x: cursorX });
-    cursorX += item.itemWidth;
-    line.width = cursorX;
-    line.maxHeight = Math.max(line.maxHeight, item.height);
-  }
-
-  // Trim trailing space/gap from each line's width
-  for (const line of lines) {
-    if (line.items.length > 0) {
-      const last = line.items[line.items.length - 1].item;
-      line.width -= (last.itemWidth - last.renderWidth);
-    }
-  }
-
-  // Calculate total height and vertical centering at 50%
+  // Calculate total height and vertically center the block
+  const lineGap = fontSize * 0.15; // small gap between lines
   let totalHeight = 0;
   for (const line of lines) totalHeight += line.maxHeight;
+  totalHeight += lineGap * (lines.length - 1);
   const blockStartY = canvasHeight * 0.5 - totalHeight / 2;
 
-  // Position elements with center alignment per line
+  // Position elements: each line is horizontally centered
   const result: PositionedElement[] = [];
   let yOff = blockStartY;
 
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
-    const xOff = (canvasWidth - line.width) / 2;
+    const xStart = (canvasWidth - line.contentWidth) / 2;
+    let xCursor = xStart;
 
-    for (const { item, x } of line.items) {
-      if (item.type === 'image') {
+    for (const elem of line.elements) {
+      if (elem.type === 'image') {
         result.push({
           type: 'image',
-          key: item.key as 'heroLogo' | 'smLogo',
-          img: item.img!,
-          x: x + xOff,
-          y: yOff + (line.maxHeight - item.height) / 2,
-          width: item.renderWidth,
-          height: item.height,
+          key: elem.key as 'heroLogo' | 'smLogo',
+          img: elem.img!,
+          x: xCursor,
+          y: yOff + (line.maxHeight - elem.height) / 2,
+          width: elem.width,
+          height: elem.height,
           lineIndex: li,
         });
+        xCursor += elem.width;
       } else {
         result.push({
           type: 'word',
-          key: item.key as 'text',
-          text: item.text!,
-          x: x + xOff,
+          key: 'text',
+          text: elem.text!,
+          x: xCursor,
           y: yOff + line.maxHeight / 2,
-          width: item.renderWidth,
-          charStart: item.charStart!,
-          charEnd: item.charEnd!,
+          width: elem.width,
+          charStart: elem.charStart!,
+          charEnd: elem.charEnd!,
           lineIndex: li,
         });
+        xCursor += elem.width + spaceWidth;
       }
     }
-    yOff += line.maxHeight;
+    yOff += line.maxHeight + lineGap;
   }
 
   return result;
@@ -246,15 +253,11 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillPng;
 
-    // Off-screen video element for SM pill animation (WebM)
-    const video = document.createElement('video');
-    video.src = smPillDashWebm;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-    video.loop = false;
-    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
-    document.body.appendChild(video);
+    // Off-screen GIF element for SM pill animation (appended to DOM so browser decodes frames)
+    const smGifImg = new Image();
+    smGifImg.src = smPillDashGif;
+    smGifImg.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
+    document.body.appendChild(smGifImg);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -285,12 +288,6 @@ export default function HeroSection() {
       textCharCount: textLength,
       duration: textLength * 0.08,
       ease: 'none',
-    });
-
-    // Start WebM video playback when SM pill begins to appear
-    masterTL.call(() => {
-      video.currentTime = 0;
-      video.play().catch(() => {});
     });
 
     // Phase 3: SM pill fades in with left-to-right shift
@@ -377,7 +374,7 @@ export default function HeroSection() {
       const isMobile = cssW < 768;
 
       ctx.globalCompositeOperation = 'source-over';
-      ctx.font = `400 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
+      ctx.font = `600 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
 
@@ -424,21 +421,26 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw video (or static fallback) on canvas so it participates in particle reveal
+            // Draw animated GIF on canvas so it participates in particle reveal
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
-            } else if (el.img.complete && el.img.naturalHeight > 0) {
-              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+            const drawSrc = smGifImg.complete && smGifImg.naturalHeight > 0 ? smGifImg : el.img;
+            if (drawSrc.complete && drawSrc.naturalHeight > 0) {
+              ctx.drawImage(drawSrc, el.x + xOffset, el.y, el.width, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
 
-          // Set initial cursor position after hero logo (before any text)
+          // Set initial cursor position: find first text word position
           if (isHero && opacity >= 0.99 && !showCursorReady) {
-            cursorPosX = el.x + el.width;
-            cursorPosY = el.y + el.height / 2;
+            const firstWord = elements.find(e => e.type === 'word');
+            if (firstWord) {
+              cursorPosX = firstWord.x;
+              cursorPosY = firstWord.y;
+            } else {
+              cursorPosX = el.x + el.width;
+              cursorPosY = el.y + el.height / 2;
+            }
             showCursorReady = true;
           }
 
@@ -526,9 +528,7 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      video.pause();
-      video.src = '';
-      if (video.parentNode) video.parentNode.removeChild(video);
+      if (smGifImg.parentNode) smGifImg.parentNode.removeChild(smGifImg);
     };
   }, []);
 
