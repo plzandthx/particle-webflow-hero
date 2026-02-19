@@ -254,7 +254,7 @@ export default function HeroSection() {
     video.preload = 'auto';
     video.loop = false;
     video.poster = smPillPng;
-    video.style.cssText = 'position:absolute;pointer-events:none;z-index:11;opacity:0;';
+    video.style.cssText = 'position:absolute;pointer-events:none;z-index:5;opacity:0;';
     container.appendChild(video);
 
     let cssW = container.offsetWidth;
