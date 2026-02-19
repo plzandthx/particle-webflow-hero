@@ -78,8 +78,9 @@ function computeInlineLayout(
 
   // Known aspect ratios from actual image files
   const heroWidth = imageHeight * (298 / 190);
-  const smPadding = fontSize * 0.35; // breathing room to prevent right-edge cropping
-  const smWidth = imageHeight * (498 / 266) + smPadding; // actual pill aspect ratio
+  const smPadding = fontSize * 0.35; // spacing between pill and adjacent items
+  const smVisualWidth = imageHeight * (498 / 266); // actual pill aspect ratio
+  const smWidth = smVisualWidth + smPadding; // layout width includes spacing
 
   // Flow item type (local to layout computation)
   type FlowItem = {
@@ -118,7 +119,7 @@ function computeInlineLayout(
   // Segment 3: SM pill logo
   flowItems.push({
     type: 'image', key: 'smLogo', img: smLogoImg,
-    itemWidth: smWidth + imageGap, renderWidth: smWidth, height: imageHeight,
+    itemWidth: smWidth + imageGap, renderWidth: smVisualWidth, height: imageHeight,
   });
 
   // Flow layout: left-to-right with line wrapping
@@ -410,15 +411,12 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw pill at native aspect ratio (498x266) scaled to match line height
-            const pillDrawW = el.height * (498 / 266);
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
             if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, pillDrawW, el.height);
+              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
             } else if (el.img.complete && el.img.naturalHeight > 0) {
-              // Fallback: draw static PNG until video is ready
-              ctx.drawImage(el.img, el.x + xOffset, el.y, pillDrawW, el.height);
+              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
