@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
-import smLogoPillPng from '../assets/sm-logo-pill.png';
+import smPillDashGif from '../assets/sm-pill-dash.gif';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -206,6 +206,7 @@ export default function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const smGifRef = useRef<HTMLImageElement>(null);
 
   const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0, prevSmX: 0, prevSmY: 0 });
   const hasFirstInputRef = useRef(false);
@@ -252,7 +253,7 @@ export default function HeroSection() {
     const logoImg = new Image();
     logoImg.src = heroLogoPng;
     const smLogoImg = new Image();
-    smLogoImg.src = smLogoPillPng;
+    smLogoImg.src = smPillDashGif;
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -406,14 +407,29 @@ export default function HeroSection() {
           const opacity = isHero ? anim.heroLogoOpacity : anim.smLogoOpacity;
           const xOffset = isHero ? anim.heroLogoXOffset : anim.smLogoXOffset;
 
-          if (opacity <= 0) continue;
+          if (opacity <= 0) {
+            // Hide GIF overlay when SM logo not yet visible
+            if (!isHero && smGifRef.current) {
+              smGifRef.current.style.opacity = '0';
+            }
+            continue;
+          }
 
-          // Draw image with opacity and x-offset
-          if (el.img.complete && el.img.naturalHeight > 0) {
-            const prevAlpha = ctx.globalAlpha;
-            ctx.globalAlpha = opacity;
-            ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
-            ctx.globalAlpha = prevAlpha;
+          if (isHero) {
+            // Draw hero logo on canvas
+            if (el.img.complete && el.img.naturalHeight > 0) {
+              const prevAlpha = ctx.globalAlpha;
+              ctx.globalAlpha = opacity;
+              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+              ctx.globalAlpha = prevAlpha;
+            }
+          } else if (smGifRef.current) {
+            // Position animated GIF overlay for SM logo (canvas can't play GIFs)
+            smGifRef.current.style.left = `${el.x + xOffset}px`;
+            smGifRef.current.style.top = `${el.y}px`;
+            smGifRef.current.style.width = `${el.width}px`;
+            smGifRef.current.style.height = `${el.height}px`;
+            smGifRef.current.style.opacity = `${opacity}`;
           }
 
           // Set initial cursor position after hero logo (before any text)
@@ -553,6 +569,19 @@ export default function HeroSection() {
           inset: 0,
           zIndex: 10,
           pointerEvents: 'none',
+        }}
+      />
+
+      {/* SM logo animated GIF overlay (canvas can't play animated GIFs) */}
+      <img
+        ref={smGifRef}
+        src={smPillDashGif}
+        alt=""
+        style={{
+          position: 'absolute',
+          zIndex: 15,
+          pointerEvents: 'none',
+          opacity: 0,
         }}
       />
 
