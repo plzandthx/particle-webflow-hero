@@ -33,6 +33,175 @@ interface ParticleData {
   tl: gsap.core.Timeline;
 }
 
+// Inline layout types
+interface PositionedImage {
+  type: 'image';
+  key: 'heroLogo' | 'smLogo';
+  img: HTMLImageElement;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineIndex: number;
+}
+
+interface PositionedWord {
+  type: 'word';
+  key: 'text1' | 'text2';
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  charStart: number;
+  charEnd: number;
+  lineIndex: number;
+}
+
+type PositionedElement = PositionedImage | PositionedWord;
+
+// Inline layout engine — flows images and text words left-to-right with line wrapping
+function computeInlineLayout(
+  ctx: CanvasRenderingContext2D,
+  logoImg: HTMLImageElement,
+  smLogoImg: HTMLImageElement,
+  fontSize: number,
+  maxWidth: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  isMobile: boolean,
+): PositionedElement[] {
+  const lineHeight = fontSize * 1.15;
+  const imageHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
+  const imageGap = fontSize * 0.3;
+  const spaceWidth = ctx.measureText(' ').width;
+
+  // Known aspect ratios from actual image files
+  const heroWidth = imageHeight * (298 / 190);
+  const smWidth = imageHeight * (308 / 164);
+
+  // Flow item type (local to layout computation)
+  type FlowItem = {
+    type: 'image' | 'word';
+    key: 'heroLogo' | 'smLogo' | 'text1' | 'text2';
+    img?: HTMLImageElement;
+    text?: string;
+    itemWidth: number;
+    renderWidth: number;
+    height: number;
+    charStart?: number;
+    charEnd?: number;
+  };
+
+  const flowItems: FlowItem[] = [];
+
+  // Segment 1: hero logo
+  flowItems.push({
+    type: 'image', key: 'heroLogo', img: logoImg,
+    itemWidth: heroWidth + imageGap, renderWidth: heroWidth, height: imageHeight,
+  });
+
+  // Segment 2: text1 words
+  const text1Words = 'Building something special at'.split(' ');
+  let charOff = 0;
+  for (const word of text1Words) {
+    const w = ctx.measureText(word).width;
+    flowItems.push({
+      type: 'word', key: 'text1', text: word,
+      itemWidth: w + spaceWidth, renderWidth: w, height: lineHeight,
+      charStart: charOff, charEnd: charOff + word.length,
+    });
+    charOff += word.length + 1;
+  }
+
+  // Segment 3: SM logo
+  flowItems.push({
+    type: 'image', key: 'smLogo', img: smLogoImg,
+    itemWidth: smWidth + imageGap, renderWidth: smWidth, height: imageHeight,
+  });
+
+  // Segment 4: text2 words
+  const text2Words = 'SurveyMonkey'.split(' ');
+  charOff = 0;
+  for (const word of text2Words) {
+    const w = ctx.measureText(word).width;
+    flowItems.push({
+      type: 'word', key: 'text2', text: word,
+      itemWidth: w + spaceWidth, renderWidth: w, height: lineHeight,
+      charStart: charOff, charEnd: charOff + word.length,
+    });
+    charOff += word.length + 1;
+  }
+
+  // Flow layout: left-to-right with line wrapping
+  type FlowLine = { items: { item: FlowItem; x: number }[]; width: number; maxHeight: number };
+  const lines: FlowLine[] = [{ items: [], width: 0, maxHeight: lineHeight }];
+  let cursorX = 0;
+
+  for (const item of flowItems) {
+    if (cursorX + item.renderWidth > maxWidth && lines[lines.length - 1].items.length > 0) {
+      lines.push({ items: [], width: 0, maxHeight: lineHeight });
+      cursorX = 0;
+    }
+    const line = lines[lines.length - 1];
+    line.items.push({ item, x: cursorX });
+    cursorX += item.itemWidth;
+    line.width = cursorX;
+    line.maxHeight = Math.max(line.maxHeight, item.height);
+  }
+
+  // Trim trailing space/gap from each line's width
+  for (const line of lines) {
+    if (line.items.length > 0) {
+      const last = line.items[line.items.length - 1].item;
+      line.width -= (last.itemWidth - last.renderWidth);
+    }
+  }
+
+  // Calculate total height and vertical centering at 40%
+  let totalHeight = 0;
+  for (const line of lines) totalHeight += line.maxHeight;
+  const blockStartY = canvasHeight * 0.4 - totalHeight / 2;
+
+  // Position elements with center alignment per line
+  const result: PositionedElement[] = [];
+  let yOff = blockStartY;
+
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const xOff = (canvasWidth - line.width) / 2;
+
+    for (const { item, x } of line.items) {
+      if (item.type === 'image') {
+        result.push({
+          type: 'image',
+          key: item.key as 'heroLogo' | 'smLogo',
+          img: item.img!,
+          x: x + xOff,
+          y: yOff + (line.maxHeight - item.height) / 2,
+          width: item.renderWidth,
+          height: item.height,
+          lineIndex: li,
+        });
+      } else {
+        result.push({
+          type: 'word',
+          key: item.key as 'text1' | 'text2',
+          text: item.text!,
+          x: x + xOff,
+          y: yOff + line.maxHeight / 2,
+          width: item.renderWidth,
+          charStart: item.charStart!,
+          charEnd: item.charEnd!,
+          lineIndex: li,
+        });
+      }
+    }
+    yOff += line.maxHeight;
+  }
+
+  return result;
+}
+
 export default function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,35 +251,64 @@ export default function HeroSection() {
     // Preload logo images
     const logoImg = new Image();
     logoImg.src = heroLogoPng;
-    let logoLoaded = false;
-    logoImg.onload = () => { logoLoaded = true; };
-
     const smLogoImg = new Image();
     smLogoImg.src = smLogoPillPng;
-    let smLogoLoaded = false;
-    smLogoImg.onload = () => { smLogoLoaded = true; };
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
-    // Typewriter state
-    const typewriterFullText = 'Building something special at SurveyMonkey';
-    let twCharIndex = 0;
-    let twCursorVisible = true;
-    let twDoneAt = 0; // timestamp when typing finished (0 = still typing)
-    const twSpeed = 80; // ms per character
-    const twCursorHideDelay = 3000; // hide cursor 3s after typing completes
+    // Animation state (tweened by GSAP master timeline)
+    const anim = {
+      heroLogoOpacity: 0,
+      heroLogoXOffset: -20,
+      text1CharCount: 0,
+      smLogoOpacity: 0,
+      smLogoXOffset: -20,
+      text2CharCount: 0,
+      cursorVisible: true,
+      cursorHidden: false,
+    };
 
-    const twTypingInterval = setInterval(() => {
-      if (twCharIndex < typewriterFullText.length) {
-        twCharIndex++;
-      } else if (!twDoneAt) {
-        twDoneAt = Date.now();
-      }
-    }, twSpeed);
+    const text1Length = 29; // "Building something special at"
+    const text2Length = 12; // "SurveyMonkey"
 
-    const twCursorInterval = setInterval(() => {
-      twCursorVisible = !twCursorVisible;
+    // GSAP master timeline — sequenced intro animation
+    const masterTL = gsap.timeline({ delay: 0.3 });
+
+    // Phase 1: Hero logo fades in with left-to-right shift
+    masterTL.to(anim, {
+      heroLogoOpacity: 1, heroLogoXOffset: 0,
+      duration: 0.35, ease: 'power3.out',
+    });
+
+    // Phase 2: Typewriter "Building something special at"
+    masterTL.to(anim, {
+      text1CharCount: text1Length,
+      duration: text1Length * 0.08,
+      ease: 'none',
+    });
+
+    // Phase 3: SM logo fades in with left-to-right shift
+    masterTL.to(anim, {
+      smLogoOpacity: 1, smLogoXOffset: 0,
+      duration: 0.35, ease: 'power3.out',
+    });
+
+    // Phase 4: Typewriter "SurveyMonkey"
+    masterTL.to(anim, {
+      text2CharCount: text2Length,
+      duration: text2Length * 0.08,
+      ease: 'none',
+    });
+
+    // Hide cursor 3s after all typing completes
+    masterTL.call(() => {
+      setTimeout(() => { anim.cursorHidden = true; }, 3000);
+    });
+
+    // Cursor blink (independent of timeline)
+    const cursorBlinkInterval = setInterval(() => {
+      anim.cursorVisible = !anim.cursorVisible;
     }, 500);
 
     const onMouseMove = (e: MouseEvent) => {
@@ -177,85 +375,79 @@ export default function HeroSection() {
       }
     };
 
-    const wrapText = (text: string, maxWidth: number, fontSize: number): string[] => {
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let currentLine = words[0];
-      for (let i = 1; i < words.length; i++) {
-        const testLine = currentLine + ' ' + words[i];
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth) {
-          lines.push(currentLine);
-          currentLine = words[i];
-        } else {
-          currentLine = testLine;
-        }
-      }
-      lines.push(currentLine);
-      return lines;
-    };
-
     const drawTextOnCanvas = () => {
       const vwSize = cssW * 0.08;
       const fontSize = Math.max(28, Math.min(vwSize, 112));
       const maxTextWidth = cssW * 0.85;
+      const isMobile = cssW < 768;
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.font = `400 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
       ctx.fillStyle = '#343835';
-      ctx.textAlign = 'center';
+      ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
 
-      // Use full text for stable layout sizing (prevents logos from jumping)
-      const fullLines = wrapText(typewriterFullText, maxTextWidth, fontSize);
-      const lineHeight = fontSize * 1.15;
-      const totalTextHeight = fullLines.length * lineHeight;
+      // Compute inline layout (stable positions from full content — no layout shift)
+      const elements = computeInlineLayout(
+        ctx, logoImg, smLogoImg, fontSize, maxTextWidth, cssW, cssH, isMobile
+      );
 
-      // Logo dimensions — 1.5x on mobile (<768px)
-      const isMobile = cssW < 768;
-      const logoHeight = fontSize * 1.2 * (isMobile ? 1.5 : 1);
-      const heroLogoWidth = logoLoaded ? (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeight : logoHeight;
-      const smLogoWidth = smLogoLoaded ? (smLogoImg.naturalWidth / smLogoImg.naturalHeight) * logoHeight : 0;
-      const logoPairGap = fontSize * 0.5;
-      const bothLogosLoaded = logoLoaded && smLogoLoaded;
-      const anyLogoLoaded = logoLoaded || smLogoLoaded;
-      const totalLogosWidth = bothLogosLoaded
-        ? heroLogoWidth + logoPairGap + smLogoWidth
-        : logoLoaded ? heroLogoWidth : smLogoWidth;
-      const logoGap = fontSize * 0.8;
-      const totalBlockHeight = (anyLogoLoaded ? logoHeight + logoGap : 0) + totalTextHeight;
-      const blockStartY = cssH * 0.4 - totalBlockHeight / 2;
+      const text1Chars = Math.floor(anim.text1CharCount);
+      const text2Chars = Math.floor(anim.text2CharCount);
 
-      // Draw logos side by side, centered as a pair
-      if (anyLogoLoaded) {
-        const pairX = (cssW - totalLogosWidth) / 2;
-        let offsetX = pairX;
-        if (logoLoaded) {
-          ctx.drawImage(logoImg, offsetX, blockStartY, heroLogoWidth, logoHeight);
-          offsetX += heroLogoWidth + logoPairGap;
-        }
-        if (smLogoLoaded) {
-          ctx.drawImage(smLogoImg, offsetX, blockStartY, smLogoWidth, logoHeight);
+      // Track cursor position
+      let cursorPosX = 0;
+      let cursorPosY = 0;
+      let showCursorReady = false;
+
+      for (const el of elements) {
+        if (el.type === 'image') {
+          const isHero = el.key === 'heroLogo';
+          const opacity = isHero ? anim.heroLogoOpacity : anim.smLogoOpacity;
+          const xOffset = isHero ? anim.heroLogoXOffset : anim.smLogoXOffset;
+
+          if (opacity <= 0) continue;
+
+          // Draw image with opacity and x-offset
+          if (el.img.complete && el.img.naturalHeight > 0) {
+            const prevAlpha = ctx.globalAlpha;
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+            ctx.globalAlpha = prevAlpha;
+          }
+
+          // Set initial cursor position after hero logo (before any text)
+          if (isHero && opacity >= 0.99 && !showCursorReady) {
+            cursorPosX = el.x + el.width;
+            cursorPosY = el.y + el.height / 2;
+            showCursorReady = true;
+          }
+        } else {
+          const segChars = el.key === 'text1' ? text1Chars : text2Chars;
+
+          if (segChars <= el.charStart) continue;
+
+          if (segChars >= el.charEnd) {
+            // Word fully revealed
+            ctx.fillText(el.text, el.x, el.y);
+            cursorPosX = el.x + el.width;
+            cursorPosY = el.y;
+            showCursorReady = true;
+          } else {
+            // Word partially revealed
+            const visCount = segChars - el.charStart;
+            const partial = el.text.substring(0, visCount);
+            ctx.fillText(partial, el.x, el.y);
+            cursorPosX = el.x + ctx.measureText(partial).width;
+            cursorPosY = el.y;
+            showCursorReady = true;
+          }
         }
       }
 
-      // Typewriter: draw only the revealed characters
-      const displayText = typewriterFullText.substring(0, twCharIndex);
-      const displayLines = wrapText(displayText, maxTextWidth, fontSize);
-      const textStartY = blockStartY + (anyLogoLoaded ? logoHeight + logoGap : 0) + lineHeight / 2;
-
-      for (let i = 0; i < displayLines.length; i++) {
-        ctx.fillText(displayLines[i], cssW / 2, textStartY + i * lineHeight);
-      }
-
-      // Blinking cursor after last typed character
-      const showCursor = twCursorVisible && (!twDoneAt || Date.now() - twDoneAt < twCursorHideDelay);
-      if (showCursor && displayLines.length > 0) {
-        const lastLine = displayLines[displayLines.length - 1];
-        const lastLineWidth = ctx.measureText(lastLine).width;
-        const cursorX = cssW / 2 + lastLineWidth / 2 + 4;
-        const cursorY = textStartY + (displayLines.length - 1) * lineHeight;
-        ctx.fillText('|', cursorX, cursorY);
+      // Blinking cursor after last visible character
+      if (showCursorReady && anim.cursorVisible && !anim.cursorHidden) {
+        ctx.fillText('|', cursorPosX + 4, cursorPosY);
       }
     };
 
@@ -310,8 +502,8 @@ export default function HeroSection() {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', updateSize);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      clearInterval(twTypingInterval);
-      clearInterval(twCursorInterval);
+      masterTL.kill();
+      clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
     };
