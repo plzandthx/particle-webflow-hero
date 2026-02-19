@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillPng from '../assets/sm-logo-pill.png';
-import smPillDashWebm from '../assets/sm-pill-dash.webm';
+import smPillDashGif from '../assets/sm-pill-dash.gif';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -150,10 +150,17 @@ function computeInlineLayout(
   });
 
   // Calculate total height and vertically center the block
-  const lineGap = fontSize * 0.15; // small gap between lines
+  const lineGap = fontSize * 0.15; // gap between text lines
+  const imageGap = lineGap * 2; // larger gap between images and text
+  const lastLineIdx = lines.length - 1;
+
+  // Compute total height using per-gap sizes
   let totalHeight = 0;
   for (const line of lines) totalHeight += line.maxHeight;
-  totalHeight += lineGap * (lines.length - 1);
+  for (let i = 0; i < lastLineIdx; i++) {
+    // Gap after hero image (line 0) or before SM pill (last line)
+    totalHeight += (i === 0 || i === lastLineIdx - 1) ? imageGap : lineGap;
+  }
   const blockStartY = canvasHeight * 0.5 - totalHeight / 2;
 
   // Position elements: each line is horizontally centered
@@ -193,7 +200,8 @@ function computeInlineLayout(
         xCursor += elem.width + spaceWidth;
       }
     }
-    yOff += line.maxHeight + lineGap;
+    const gap = (li === 0 || li === lastLineIdx - 1) ? imageGap : lineGap;
+    yOff += line.maxHeight + gap;
   }
 
   return result;
@@ -253,15 +261,11 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillPng;
 
-    // Off-screen video element for SM pill animation (WebM)
-    const video = document.createElement('video');
-    video.src = smPillDashWebm;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-    video.loop = false;
-    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
-    document.body.appendChild(video);
+    // Off-screen GIF element for SM pill animation (appended to DOM so browser decodes frames)
+    const smGifImg = new Image();
+    smGifImg.src = smPillDashGif;
+    smGifImg.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
+    document.body.appendChild(smGifImg);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -292,12 +296,6 @@ export default function HeroSection() {
       textCharCount: textLength,
       duration: textLength * 0.08,
       ease: 'none',
-    });
-
-    // Start WebM video playback when SM pill begins to appear
-    masterTL.call(() => {
-      video.currentTime = 0;
-      video.play().catch(() => {});
     });
 
     // Phase 3: SM pill fades in with left-to-right shift
@@ -384,7 +382,7 @@ export default function HeroSection() {
       const isMobile = cssW < 768;
 
       ctx.globalCompositeOperation = 'source-over';
-      ctx.font = `600 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
+      ctx.font = `500 ${fontSize}px 'Inter Tight', 'Inter', system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
 
@@ -431,13 +429,12 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw video (or static fallback) on canvas so it participates in particle reveal
+            // Draw animated GIF on canvas so it participates in particle reveal
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
-            } else if (el.img.complete && el.img.naturalHeight > 0) {
-              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+            const drawSrc = smGifImg.complete && smGifImg.naturalHeight > 0 ? smGifImg : el.img;
+            if (drawSrc.complete && drawSrc.naturalHeight > 0) {
+              ctx.drawImage(drawSrc, el.x + xOffset, el.y, el.width, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
@@ -539,9 +536,7 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      video.pause();
-      video.src = '';
-      if (video.parentNode) video.parentNode.removeChild(video);
+      if (smGifImg.parentNode) smGifImg.parentNode.removeChild(smGifImg);
     };
   }, []);
 
