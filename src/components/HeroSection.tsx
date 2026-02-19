@@ -78,8 +78,8 @@ function computeInlineLayout(
 
   // Known aspect ratios from actual image files
   const heroWidth = imageHeight * (298 / 190);
-  const smPadding = fontSize * 0.15; // breathing room to prevent right-edge cropping
-  const smWidth = imageHeight * (498 / 266) + smPadding; // actual GIF aspect ratio
+  const smPadding = fontSize * 0.35; // breathing room to prevent right-edge cropping
+  const smWidth = imageHeight * (498 / 266) + smPadding; // actual pill aspect ratio
 
   // Flow item type (local to layout computation)
   type FlowItem = {
@@ -251,7 +251,7 @@ export default function HeroSection() {
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
-    video.loop = true;
+    video.loop = false;
     video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
     document.body.appendChild(video);
 
@@ -410,17 +410,14 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw pill WebM centered within padded layout box to prevent edge cropping
-            const pillPad = fontSize * 0.15;
-            const drawW = el.width - pillPad;
-            const drawX = el.x + xOffset + pillPad / 2;
+            // Draw pill WebM flush-left in layout box; right padding prevents cropping
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
             if (video.readyState >= 2) {
-              ctx.drawImage(video, drawX, el.y, drawW, el.height);
+              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
             } else if (el.img.complete && el.img.naturalHeight > 0) {
               // Fallback: draw static PNG until video is ready
-              ctx.drawImage(el.img, drawX, el.y, drawW, el.height);
+              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
