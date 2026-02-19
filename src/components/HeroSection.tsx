@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillPng from '../assets/sm-logo-pill.png';
-import smPillDashGif from '../assets/sm-pill-dash.gif';
+import smPillDashWebm from '../assets/sm-pill-dash.webm';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -261,11 +261,15 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillPng;
 
-    // Off-screen GIF element for SM pill animation (appended to DOM so browser decodes frames)
-    const smGifImg = new Image();
-    smGifImg.src = smPillDashGif;
-    smGifImg.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;pointer-events:none;';
-    document.body.appendChild(smGifImg);
+    // Off-screen video element for SM pill animation (WebM)
+    const video = document.createElement('video');
+    video.src = smPillDashWebm;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.loop = false;
+    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
+    document.body.appendChild(video);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -296,6 +300,12 @@ export default function HeroSection() {
       textCharCount: textLength,
       duration: textLength * 0.08,
       ease: 'none',
+    });
+
+    // Start WebM video playback when SM pill begins to appear
+    masterTL.call(() => {
+      video.currentTime = 0;
+      video.play().catch(() => {});
     });
 
     // Phase 3: SM pill fades in with left-to-right shift
@@ -429,12 +439,13 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw animated GIF on canvas so it participates in particle reveal
+            // Draw video (or static fallback) on canvas so it participates in particle reveal
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            const drawSrc = smGifImg.complete && smGifImg.naturalHeight > 0 ? smGifImg : el.img;
-            if (drawSrc.complete && drawSrc.naturalHeight > 0) {
-              ctx.drawImage(drawSrc, el.x + xOffset, el.y, el.width, el.height);
+            if (video.readyState >= 2) {
+              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
+            } else if (el.img.complete && el.img.naturalHeight > 0) {
+              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
@@ -536,7 +547,9 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      if (smGifImg.parentNode) smGifImg.parentNode.removeChild(smGifImg);
+      video.pause();
+      video.src = '';
+      if (video.parentNode) video.parentNode.removeChild(video);
     };
   }, []);
 
