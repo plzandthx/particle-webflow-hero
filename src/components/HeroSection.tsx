@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
-import smPillDashGif from '../assets/sm-pill-dash.gif';
+import smPillPng from '../assets/sm-logo-pill.png';
+import smPillDashWebm from '../assets/sm-pill-dash.webm';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -236,11 +237,23 @@ export default function HeroSection() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Preload logo images
+    // Preload hero logo
     const logoImg = new Image();
     logoImg.src = heroLogoPng;
+
+    // Static pill image for layout sizing
     const smLogoImg = new Image();
-    smLogoImg.src = smPillDashGif;
+    smLogoImg.src = smPillPng;
+
+    // Off-screen video element for SM pill animation (WebM)
+    const video = document.createElement('video');
+    video.src = smPillDashWebm;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.loop = true;
+    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
+    document.body.appendChild(video);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -271,6 +284,12 @@ export default function HeroSection() {
       textCharCount: textLength,
       duration: textLength * 0.08,
       ease: 'none',
+    });
+
+    // Start WebM video playback when SM pill begins to appear
+    masterTL.call(() => {
+      video.currentTime = 0;
+      video.play().catch(() => {});
     });
 
     // Phase 3: SM pill fades in with left-to-right shift
@@ -391,13 +410,18 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw pill centered within padded layout box to prevent edge cropping
+            // Draw pill WebM centered within padded layout box to prevent edge cropping
             const pillPad = fontSize * 0.15;
             const drawW = el.width - pillPad;
             const drawX = el.x + xOffset + pillPad / 2;
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            ctx.drawImage(el.img, drawX, el.y, drawW, el.height);
+            if (video.readyState >= 2) {
+              ctx.drawImage(video, drawX, el.y, drawW, el.height);
+            } else if (el.img.complete && el.img.naturalHeight > 0) {
+              // Fallback: draw static PNG until video is ready
+              ctx.drawImage(el.img, drawX, el.y, drawW, el.height);
+            }
             ctx.globalAlpha = prevAlpha;
           }
 
@@ -492,6 +516,9 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
+      video.pause();
+      video.src = '';
+      if (video.parentNode) video.parentNode.removeChild(video);
     };
   }, []);
 
