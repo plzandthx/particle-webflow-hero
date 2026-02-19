@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
-import lottie from 'lottie-web';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillDashGif from '../assets/sm-pill-dash.gif';
-import smPillDashLottie from '../assets/sm-pill-dash.json';
+import smPillDashWebm from '../assets/sm-pill-dash.webm';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -256,24 +255,14 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
-    // Hidden wrapper div for Lottie — it creates its own canvas inside
-    const lottieWrapper = document.createElement('div');
-    lottieWrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:498px;height:266px;pointer-events:none;overflow:hidden;';
-    document.body.appendChild(lottieWrapper);
-    const lottieAnim = lottie.loadAnimation({
-      container: lottieWrapper,
-      renderer: 'canvas',
-      loop: false,
-      autoplay: false,
-      animationData: smPillDashLottie,
-    });
-    // Lottie creates the canvas synchronously — grab it
-    const lottieCanvas = lottieWrapper.querySelector('canvas')!;
-    // Manual frame control state
-    let lottieStartTime = 0;
-    let lottieIsPlaying = false;
-    const lottieFps = (smPillDashLottie as { fr: number }).fr;        // 60
-    const lottieTotalFrames = (smPillDashLottie as { op: number }).op; // 82.8
+    // Off-screen video element for SM pill animation (WebM)
+    const video = document.createElement('video');
+    video.src = smPillDashWebm;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
+    document.body.appendChild(video);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -309,11 +298,10 @@ export default function HeroSection() {
       ease: 'none',
     });
 
-    // Start Lottie playback when SM logo begins to appear
+    // Start WebM video playback when SM logo begins to appear
     masterTL.call(() => {
-      lottieIsPlaying = true;
-      lottieStartTime = performance.now();
-      lottieAnim.goToAndStop(0, true);
+      video.currentTime = 0;
+      video.play().catch(() => {});
     });
 
     // Phase 3: SM logo fades in with left-to-right shift
@@ -445,10 +433,15 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw current Lottie frame onto canvas so particles erase it like other content
+            // Draw current video frame onto canvas so particles erase it like other content
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            ctx.drawImage(lottieCanvas, el.x + xOffset, el.y, el.width, el.height);
+            if (video.readyState >= 2) {
+              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
+            } else {
+              // Fallback: draw static GIF image until video is ready
+              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+            }
             ctx.globalAlpha = prevAlpha;
           }
 
@@ -496,16 +489,6 @@ export default function HeroSection() {
 
       emitParticles();
 
-      // Manually advance Lottie to the correct frame
-      if (lottieIsPlaying) {
-        const elapsed = (performance.now() - lottieStartTime) / 1000;
-        const frame = Math.min(elapsed * lottieFps, lottieTotalFrames - 1);
-        lottieAnim.goToAndStop(frame, true);
-        if (frame >= lottieTotalFrames - 1) {
-          lottieIsPlaying = false;
-        }
-      }
-
       if (cursorRef.current) {
         cursorRef.current.style.display = isTouchRef.current ? 'none' : 'block';
         cursorRef.current.style.transform = `translate(${mouse.x}px, ${mouse.y}px)`;
@@ -552,8 +535,9 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      lottieAnim.destroy();
-      if (lottieWrapper.parentNode) lottieWrapper.parentNode.removeChild(lottieWrapper);
+      video.pause();
+      video.src = '';
+      if (video.parentNode) video.parentNode.removeChild(video);
     };
   }, []);
 
