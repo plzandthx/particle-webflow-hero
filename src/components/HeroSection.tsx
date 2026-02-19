@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
-import { parseGIF, decompressFrames } from 'gifuct-js';
+import lottie from 'lottie-web';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillDashGif from '../assets/sm-pill-dash.gif';
+import smPillDashLottie from '../assets/sm-pill-dash.json';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -59,73 +60,6 @@ interface PositionedWord {
 }
 
 type PositionedElement = PositionedImage | PositionedWord;
-
-interface GifPlaybackState {
-  frames: ImageBitmap[];
-  delays: number[];
-  playing: boolean;
-  finished: boolean;
-  currentFrame: number;
-  frameStartTime: number;
-  ready: boolean;
-}
-
-// Decode animated GIF into pre-composited ImageBitmap frames
-async function decodeGifFrames(url: string): Promise<{ frames: ImageBitmap[]; delays: number[] }> {
-  const resp = await fetch(url);
-  const buffer = await resp.arrayBuffer();
-  const gif = parseGIF(buffer);
-  const rawFrames = decompressFrames(gif, true);
-
-  if (rawFrames.length === 0) throw new Error('GIF has no frames');
-
-  const gifWidth = gif.lsd.width;
-  const gifHeight = gif.lsd.height;
-
-  // Offscreen canvas for compositing patches into full frames
-  const compCanvas = document.createElement('canvas');
-  compCanvas.width = gifWidth;
-  compCanvas.height = gifHeight;
-  const compCtx = compCanvas.getContext('2d')!;
-
-  const patchCanvas = document.createElement('canvas');
-  const patchCtx = patchCanvas.getContext('2d')!;
-
-  const bitmaps: ImageBitmap[] = [];
-  const delays: number[] = [];
-
-  for (const frame of rawFrames) {
-    const { dims, patch, delay, disposalType } = frame;
-
-    // Save state before drawing for disposal type 3 (restore to previous)
-    let restoreData: ImageData | null = null;
-    if (disposalType === 3) {
-      restoreData = compCtx.getImageData(0, 0, gifWidth, gifHeight);
-    }
-
-    // Draw this frame's patch onto the compositing canvas
-    patchCanvas.width = dims.width;
-    patchCanvas.height = dims.height;
-    const patchImageData = patchCtx.createImageData(dims.width, dims.height);
-    patchImageData.data.set(patch);
-    patchCtx.putImageData(patchImageData, 0, 0);
-    compCtx.drawImage(patchCanvas, dims.left, dims.top);
-
-    // Snapshot the fully composed frame
-    const bitmap = await createImageBitmap(compCanvas);
-    bitmaps.push(bitmap);
-    delays.push(Math.max(delay * 10, 20)); // centiseconds → ms, min 20ms
-
-    // Handle disposal after snapshot
-    if (disposalType === 2) {
-      compCtx.clearRect(dims.left, dims.top, dims.width, dims.height);
-    } else if (disposalType === 3 && restoreData) {
-      compCtx.putImageData(restoreData, 0, 0);
-    }
-  }
-
-  return { frames: bitmaps, delays };
-}
 
 // Inline layout engine — flows images and text words left-to-right with line wrapping
 function computeInlineLayout(
@@ -274,10 +208,6 @@ export default function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const gifStateRef = useRef<GifPlaybackState>({
-    frames: [], delays: [], playing: false, finished: false,
-    currentFrame: 0, frameStartTime: 0, ready: false,
-  });
 
   const mouseRef = useRef<Mouse>({ x: 0, y: 0, smoothX: 0, smoothY: 0, diff: 0, prevSmX: 0, prevSmY: 0 });
   const hasFirstInputRef = useRef(false);
@@ -326,23 +256,20 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
-    // Decode GIF frames asynchronously for manual canvas playback
-    let decodeAborted = false;
-    decodeGifFrames(smPillDashGif).then(({ frames, delays }) => {
-      if (decodeAborted) {
-        frames.forEach(b => b.close());
-        return;
-      }
-      const gs = gifStateRef.current;
-      gs.frames = frames;
-      gs.delays = delays;
-      gs.ready = true;
-      // If Phase 3 already triggered while we were decoding, start now
-      if (gs.playing && gs.frameStartTime === 0) {
-        gs.frameStartTime = performance.now();
-      }
-    }).catch(err => {
-      console.warn('GIF frame decode failed:', err);
+    // Offscreen canvas for Lottie to render onto
+    const lottieCanvas = document.createElement('canvas');
+    lottieCanvas.width = 498;
+    lottieCanvas.height = 266;
+    const lottieAnim = lottie.loadAnimation({
+      container: lottieCanvas as unknown as Element,
+      renderer: 'canvas',
+      loop: false,
+      autoplay: false,
+      animationData: smPillDashLottie,
+      rendererSettings: {
+        context: lottieCanvas.getContext('2d')!,
+        clearCanvas: true,
+      },
     });
 
     let cssW = container.offsetWidth;
@@ -379,16 +306,10 @@ export default function HeroSection() {
       ease: 'none',
     });
 
-    // Start GIF playback when SM logo begins to appear
+    // Start Lottie playback when SM logo begins to appear
     masterTL.call(() => {
-      const gs = gifStateRef.current;
-      gs.playing = true;
-      gs.finished = false;
-      gs.currentFrame = 0;
-      if (gs.ready) {
-        gs.frameStartTime = performance.now();
-      }
-      // If not ready yet, frameStartTime will be set when decode completes
+      lottieAnim.goToAndStop(0, true);
+      lottieAnim.play();
     });
 
     // Phase 3: SM logo fades in with left-to-right shift
@@ -478,26 +399,6 @@ export default function HeroSection() {
       }
     };
 
-    const advanceGifFrame = (now: number) => {
-      const gs = gifStateRef.current;
-      if (!gs.ready || !gs.playing || gs.finished || gs.frameStartTime === 0) return;
-
-      // Advance through all frames whose delay has elapsed (handles multiple per tick)
-      while (gs.currentFrame < gs.frames.length - 1) {
-        const elapsed = now - gs.frameStartTime;
-        if (elapsed < gs.delays[gs.currentFrame]) break;
-        gs.frameStartTime += gs.delays[gs.currentFrame];
-        gs.currentFrame++;
-      }
-
-      // Check if we've reached the last frame
-      if (gs.currentFrame >= gs.frames.length - 1) {
-        gs.currentFrame = gs.frames.length - 1;
-        gs.playing = false;
-        gs.finished = true;
-      }
-    };
-
     const drawTextOnCanvas = () => {
       const vwSize = cssW * 0.08;
       const fontSize = Math.max(28, Math.min(vwSize, 112));
@@ -540,14 +441,11 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw decoded GIF frame onto canvas so particles erase it like other content
-            const gs = gifStateRef.current;
-            if (gs.ready && gs.frames.length > 0) {
-              const prevAlpha = ctx.globalAlpha;
-              ctx.globalAlpha = opacity;
-              ctx.drawImage(gs.frames[gs.currentFrame], el.x + xOffset, el.y, el.width, el.height);
-              ctx.globalAlpha = prevAlpha;
-            }
+            // Draw current Lottie frame onto canvas so particles erase it like other content
+            const prevAlpha = ctx.globalAlpha;
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(lottieCanvas, el.x + xOffset, el.y, el.width, el.height);
+            ctx.globalAlpha = prevAlpha;
           }
 
           // Set initial cursor position after hero logo (before any text)
@@ -593,7 +491,6 @@ export default function HeroSection() {
       mouse.diff = Math.hypot(mouse.x - mouse.smoothX, mouse.y - mouse.smoothY);
 
       emitParticles();
-      advanceGifFrame(performance.now());
 
       if (cursorRef.current) {
         cursorRef.current.style.display = isTouchRef.current ? 'none' : 'block';
@@ -641,11 +538,7 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      decodeAborted = true;
-      const gs = gifStateRef.current;
-      gs.frames.forEach(b => b.close());
-      gs.frames = [];
-      gs.ready = false;
+      lottieAnim.destroy();
     };
   }, []);
 
