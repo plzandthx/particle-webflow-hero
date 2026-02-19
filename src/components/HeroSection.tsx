@@ -246,15 +246,16 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillPng;
 
-    // Off-screen video element for SM pill animation (WebM)
+    // HTML video element for SM pill — overlaid on the container instead of drawn on canvas
     const video = document.createElement('video');
     video.src = smPillDashWebm;
     video.muted = true;
     video.playsInline = true;
     video.preload = 'auto';
     video.loop = false;
-    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
-    document.body.appendChild(video);
+    video.poster = smPillPng;
+    video.style.cssText = 'position:absolute;pointer-events:none;z-index:11;opacity:0;';
+    container.appendChild(video);
 
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
@@ -411,14 +412,12 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            const prevAlpha = ctx.globalAlpha;
-            ctx.globalAlpha = opacity;
-            if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
-            } else if (el.img.complete && el.img.naturalHeight > 0) {
-              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
-            }
-            ctx.globalAlpha = prevAlpha;
+            // Position the HTML video element to match layout
+            video.style.left = `${el.x + xOffset}px`;
+            video.style.top = `${el.y}px`;
+            video.style.height = `${el.height}px`;
+            video.style.aspectRatio = '498 / 266';
+            video.style.opacity = String(opacity);
           }
 
           // Set initial cursor position after hero logo (before any text)
