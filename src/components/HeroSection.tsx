@@ -78,7 +78,8 @@ function computeInlineLayout(
 
   // Known aspect ratios from actual image files
   const heroWidth = imageHeight * (298 / 190);
-  const smWidth = imageHeight * (308 / 164);
+  const smPadding = fontSize * 0.06; // prevent right-edge cropping
+  const smWidth = imageHeight * (308 / 164) + smPadding;
 
   // Flow item type (local to layout computation)
   type FlowItem = {
@@ -427,6 +428,12 @@ export default function HeroSection() {
             cursorPosX = el.x + el.width;
             cursorPosY = el.y + el.height / 2;
             showCursorReady = true;
+          }
+
+          // Move cursor to after SM pill once it's visible
+          if (!isHero && opacity >= 0.99) {
+            cursorPosX = el.x + el.width;
+            cursorPosY = el.y + el.height / 2;
           }
         } else {
           const segChars = textChars;
