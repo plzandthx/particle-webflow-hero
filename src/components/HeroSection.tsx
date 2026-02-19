@@ -48,7 +48,7 @@ interface PositionedImage {
 
 interface PositionedWord {
   type: 'word';
-  key: 'text1' | 'text2';
+  key: 'text';
   text: string;
   x: number;
   y: number;
@@ -83,7 +83,7 @@ function computeInlineLayout(
   // Flow item type (local to layout computation)
   type FlowItem = {
     type: 'image' | 'word';
-    key: 'heroLogo' | 'smLogo' | 'text1' | 'text2';
+    key: 'heroLogo' | 'smLogo' | 'text';
     img?: HTMLImageElement;
     text?: string;
     itemWidth: number;
@@ -101,37 +101,24 @@ function computeInlineLayout(
     itemWidth: heroWidth + imageGap, renderWidth: heroWidth, height: imageHeight,
   });
 
-  // Segment 2: text1 words
-  const text1Words = 'Building something special at'.split(' ');
+  // Segment 2: all text words
+  const textWords = 'Building something special at SurveyMonkey'.split(' ');
   let charOff = 0;
-  for (const word of text1Words) {
+  for (const word of textWords) {
     const w = ctx.measureText(word).width;
     flowItems.push({
-      type: 'word', key: 'text1', text: word,
+      type: 'word', key: 'text', text: word,
       itemWidth: w + spaceWidth, renderWidth: w, height: lineHeight,
       charStart: charOff, charEnd: charOff + word.length,
     });
     charOff += word.length + 1;
   }
 
-  // Segment 3: SM logo
+  // Segment 3: SM pill logo
   flowItems.push({
     type: 'image', key: 'smLogo', img: smLogoImg,
     itemWidth: smWidth + imageGap, renderWidth: smWidth, height: imageHeight,
   });
-
-  // Segment 4: text2 words
-  const text2Words = 'SurveyMonkey'.split(' ');
-  charOff = 0;
-  for (const word of text2Words) {
-    const w = ctx.measureText(word).width;
-    flowItems.push({
-      type: 'word', key: 'text2', text: word,
-      itemWidth: w + spaceWidth, renderWidth: w, height: lineHeight,
-      charStart: charOff, charEnd: charOff + word.length,
-    });
-    charOff += word.length + 1;
-  }
 
   // Flow layout: left-to-right with line wrapping
   type FlowLine = { items: { item: FlowItem; x: number }[]; width: number; maxHeight: number };
@@ -186,7 +173,7 @@ function computeInlineLayout(
       } else {
         result.push({
           type: 'word',
-          key: item.key as 'text1' | 'text2',
+          key: item.key as 'text',
           text: item.text!,
           x: x + xOff,
           y: yOff + line.maxHeight / 2,
@@ -271,16 +258,14 @@ export default function HeroSection() {
     const anim = {
       heroLogoOpacity: 0,
       heroLogoXOffset: -20,
-      text1CharCount: 0,
+      textCharCount: 0,
       smLogoOpacity: 0,
       smLogoXOffset: -20,
-      text2CharCount: 0,
       cursorVisible: true,
       cursorHidden: false,
     };
 
-    const text1Length = 29; // "Building something special at"
-    const text2Length = 12; // "SurveyMonkey"
+    const textLength = 42; // "Building something special at SurveyMonkey"
 
     // GSAP master timeline — sequenced intro animation
     const masterTL = gsap.timeline({ delay: 0.3 });
@@ -291,30 +276,23 @@ export default function HeroSection() {
       duration: 0.35, ease: 'power3.out',
     });
 
-    // Phase 2: Typewriter "Building something special at"
+    // Phase 2: Typewriter "Building something special at SurveyMonkey"
     masterTL.to(anim, {
-      text1CharCount: text1Length,
-      duration: text1Length * 0.08,
+      textCharCount: textLength,
+      duration: textLength * 0.08,
       ease: 'none',
     });
 
-    // Start WebM video playback when SM logo begins to appear
+    // Start WebM video playback when SM pill begins to appear
     masterTL.call(() => {
       video.currentTime = 0;
       video.play().catch(() => {});
     });
 
-    // Phase 3: SM logo fades in with left-to-right shift
+    // Phase 3: SM pill WebM fades in with left-to-right shift
     masterTL.to(anim, {
       smLogoOpacity: 1, smLogoXOffset: 0,
       duration: 0.35, ease: 'power3.out',
-    });
-
-    // Phase 4: Typewriter "SurveyMonkey"
-    masterTL.to(anim, {
-      text2CharCount: text2Length,
-      duration: text2Length * 0.08,
-      ease: 'none',
     });
 
     // Hide cursor 3s after all typing completes
@@ -408,8 +386,7 @@ export default function HeroSection() {
         ctx, logoImg, smLogoImg, fontSize, maxTextWidth, cssW, cssH, isMobile
       );
 
-      const text1Chars = Math.floor(anim.text1CharCount);
-      const text2Chars = Math.floor(anim.text2CharCount);
+      const textChars = Math.floor(anim.textCharCount);
 
       // Track cursor position
       let cursorPosX = 0;
@@ -452,7 +429,7 @@ export default function HeroSection() {
             showCursorReady = true;
           }
         } else {
-          const segChars = el.key === 'text1' ? text1Chars : text2Chars;
+          const segChars = textChars;
 
           if (segChars <= el.charStart) continue;
 
