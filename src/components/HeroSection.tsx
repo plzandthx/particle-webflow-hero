@@ -410,14 +410,15 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw pill WebM flush-left in layout box; right padding prevents cropping
+            // Draw pill at native aspect ratio (498x266) scaled to match line height
+            const pillDrawW = el.height * (498 / 266);
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
             if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
+              ctx.drawImage(video, el.x + xOffset, el.y, pillDrawW, el.height);
             } else if (el.img.complete && el.img.naturalHeight > 0) {
               // Fallback: draw static PNG until video is ready
-              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
+              ctx.drawImage(el.img, el.x + xOffset, el.y, pillDrawW, el.height);
             }
             ctx.globalAlpha = prevAlpha;
           }
