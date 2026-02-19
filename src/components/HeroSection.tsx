@@ -256,23 +256,19 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
-    // Offscreen canvas for Lottie to render onto (must be in DOM for sizing)
-    const lottieCanvas = document.createElement('canvas');
-    lottieCanvas.width = 498;
-    lottieCanvas.height = 266;
-    lottieCanvas.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:498px;height:266px;pointer-events:none;';
-    document.body.appendChild(lottieCanvas);
+    // Hidden wrapper div for Lottie — it creates its own canvas inside
+    const lottieWrapper = document.createElement('div');
+    lottieWrapper.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:498px;height:266px;pointer-events:none;overflow:hidden;';
+    document.body.appendChild(lottieWrapper);
     const lottieAnim = lottie.loadAnimation({
-      container: lottieCanvas as unknown as Element,
+      container: lottieWrapper,
       renderer: 'canvas',
       loop: false,
       autoplay: false,
       animationData: smPillDashLottie,
-      rendererSettings: {
-        context: lottieCanvas.getContext('2d')!,
-        clearCanvas: true,
-      },
     });
+    // Lottie creates the canvas synchronously — grab it
+    const lottieCanvas = lottieWrapper.querySelector('canvas')!;
     // Manual frame control state
     let lottieStartTime = 0;
     let lottieIsPlaying = false;
@@ -557,7 +553,7 @@ export default function HeroSection() {
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
       lottieAnim.destroy();
-      if (lottieCanvas.parentNode) lottieCanvas.parentNode.removeChild(lottieCanvas);
+      if (lottieWrapper.parentNode) lottieWrapper.parentNode.removeChild(lottieWrapper);
     };
   }, []);
 
