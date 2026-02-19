@@ -157,10 +157,10 @@ function computeInlineLayout(
     }
   }
 
-  // Calculate total height and vertical centering at 40%
+  // Calculate total height and vertical centering at 50%
   let totalHeight = 0;
   for (const line of lines) totalHeight += line.maxHeight;
-  const blockStartY = canvasHeight * 0.4 - totalHeight / 2;
+  const blockStartY = canvasHeight * 0.5 - totalHeight / 2;
 
   // Position elements with center alignment per line
   const result: PositionedElement[] = [];
