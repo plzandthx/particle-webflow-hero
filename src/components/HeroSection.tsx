@@ -3,7 +3,6 @@ import { gsap } from 'gsap';
 import { LiquidMetal } from '@paper-design/shaders-react';
 import heroLogoPng from '../assets/hero-logo.png';
 import smPillDashGif from '../assets/sm-pill-dash.gif';
-import smPillDashWebm from '../assets/sm-pill-dash.webm';
 
 class ShaderErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -78,8 +77,8 @@ function computeInlineLayout(
 
   // Known aspect ratios from actual image files
   const heroWidth = imageHeight * (298 / 190);
-  const smPadding = fontSize * 0.06; // prevent right-edge cropping
-  const smWidth = imageHeight * (308 / 164) + smPadding;
+  const smPadding = fontSize * 0.15; // breathing room to prevent right-edge cropping
+  const smWidth = imageHeight * (498 / 266) + smPadding; // actual GIF aspect ratio
 
   // Flow item type (local to layout computation)
   type FlowItem = {
@@ -243,15 +242,6 @@ export default function HeroSection() {
     const smLogoImg = new Image();
     smLogoImg.src = smPillDashGif;
 
-    // Off-screen video element for SM pill animation (WebM)
-    const video = document.createElement('video');
-    video.src = smPillDashWebm;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-    video.style.cssText = 'position:fixed;top:-9999px;left:-9999px;pointer-events:none;';
-    document.body.appendChild(video);
-
     let cssW = container.offsetWidth;
     let cssH = container.offsetHeight;
 
@@ -263,7 +253,6 @@ export default function HeroSection() {
       smLogoOpacity: 0,
       smLogoXOffset: -20,
       cursorVisible: true,
-      cursorHidden: false,
     };
 
     const textLength = 42; // "Building something special at SurveyMonkey"
@@ -284,22 +273,13 @@ export default function HeroSection() {
       ease: 'none',
     });
 
-    // Start WebM video playback when SM pill begins to appear
-    masterTL.call(() => {
-      video.currentTime = 0;
-      video.play().catch(() => {});
-    });
-
-    // Phase 3: SM pill WebM fades in with left-to-right shift
+    // Phase 3: SM pill fades in with left-to-right shift
     masterTL.to(anim, {
       smLogoOpacity: 1, smLogoXOffset: 0,
       duration: 0.35, ease: 'power3.out',
     });
 
-    // Hide cursor 3s after all typing completes
-    masterTL.call(() => {
-      setTimeout(() => { anim.cursorHidden = true; }, 3000);
-    });
+    // (cursor hides automatically when typing completes — handled in draw loop)
 
     // Cursor blink (independent of timeline)
     const cursorBlinkInterval = setInterval(() => {
@@ -411,15 +391,13 @@ export default function HeroSection() {
               ctx.globalAlpha = prevAlpha;
             }
           } else {
-            // Draw current video frame onto canvas so particles erase it like other content
+            // Draw pill centered within padded layout box to prevent edge cropping
+            const pillPad = fontSize * 0.15;
+            const drawW = el.width - pillPad;
+            const drawX = el.x + xOffset + pillPad / 2;
             const prevAlpha = ctx.globalAlpha;
             ctx.globalAlpha = opacity;
-            if (video.readyState >= 2) {
-              ctx.drawImage(video, el.x + xOffset, el.y, el.width, el.height);
-            } else {
-              // Fallback: draw static GIF image until video is ready
-              ctx.drawImage(el.img, el.x + xOffset, el.y, el.width, el.height);
-            }
+            ctx.drawImage(el.img, drawX, el.y, drawW, el.height);
             ctx.globalAlpha = prevAlpha;
           }
 
@@ -430,11 +408,6 @@ export default function HeroSection() {
             showCursorReady = true;
           }
 
-          // Move cursor to after SM pill once it's visible
-          if (!isHero && opacity >= 0.99) {
-            cursorPosX = el.x + el.width;
-            cursorPosY = el.y + el.height / 2;
-          }
         } else {
           const segChars = textChars;
 
@@ -458,8 +431,8 @@ export default function HeroSection() {
         }
       }
 
-      // Blinking cursor after last visible character
-      if (showCursorReady && anim.cursorVisible && !anim.cursorHidden) {
+      // Blinking cursor — only visible while typing is in progress
+      if (showCursorReady && anim.cursorVisible && textChars > 0 && textChars < textLength) {
         ctx.fillText('|', cursorPosX + 4, cursorPosY);
       }
     };
@@ -519,9 +492,6 @@ export default function HeroSection() {
       clearInterval(cursorBlinkInterval);
       particles.forEach(p => p.tl.kill());
       particles.length = 0;
-      video.pause();
-      video.src = '';
-      if (video.parentNode) video.parentNode.removeChild(video);
     };
   }, []);
 
